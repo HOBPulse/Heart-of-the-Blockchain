@@ -1,0 +1,37 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: Merkle Tree rules for ZK-PrivateMixer and Light Protocol cross-stack consistency.
+globs: ["contracts/**/*.sol", "circuits/**/*.circom", "external/light-protocol/**"]
+alwaysApply: true
+---
+
+## 1. ZERO_VALUE Consistency
+
+- Use the same ZERO_VALUE (Poseidon(0,0)) in Solidity, Circom, JS, and Rust.
+- Document the exact hex value and its origin in code and documentation.
+
+## 2. Inclusion Proofs
+
+- Export inclusion vectors in JSON with fields: `leaf`, `root`, `path_elements`, `path_indices`.
+- In single-leaf trees, all siblings are ZERO_VALUE.
+- For multi-leaf trees, reconstruct the proof by traversing the tree.
+
+## 3. Serialization
+
+- All values must be serialized as hex strings (with `0x` prefix).
+
+## 4. Cross-stack Compatibility
+
+- Vectors generated in Rust (Light Protocol) must be verifiable in Circom and Solidity.
+- Document any encoding or padding differences found.
+
+## 5. Testing
+
+- Always test that the root and proof generated in Rust match those verified in Circom and Solidity.
+- If any mismatch occurs, document and resolve before marking as done.
+
+---

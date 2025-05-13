@@ -1,0 +1,64 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: Unified workflow and best practices for Circom, snarkjs, and Solidity integration in ZK Mixer projects.
+globs: ["circuits/**/*.circom", "scripts/**/*.js", "contracts/**/*.sol"]
+alwaysApply: true
+---
+
+## 1. Circuit Compilation & Trusted Setup
+
+- Always clean build artifacts before recompiling or changing the circuit.
+- Compile the circuit with consistent flags and library paths:
+  ```bash
+  circom circuits/mixer.circom --r1cs --wasm --sym --output build/mixer -l node_modules/circomlib/circuits
+  ```
+- Trusted setup:
+  - Download the correct ptau file.
+  - Run `snarkjs groth16 setup`, `contribute`, and `export verificationkey` in sequence.
+- Never mix artifacts from different circuit versions or trusted setups.
+
+## 2. Merkle Tree Consistency
+
+rkle tree logic and ZERO_VALUE (Poseidon(0,0)) across JS, Circom, and Solidity.
+- Generate inclusion proofs with the same library as the circuit expects (e.g., `@zk-kit/incremental-merkle-tree` for classic Merkle).
+- Test vectors for Poseidon(0,0), Poseidon(1,2), and empty root must match across all stacks.
+
+## 3. Verifier Contract Management
+
+- Use unique or fully qualified contract names in Hardhat to avoid artifact ambiguity:
+  ```js
+  const Verifier = await hre.ethers.getContractFactory("contracts/Verifier.sol:Groth16Verifier");
+  ```
+- Never deploy mocks or test contracts in production.
+- Update your `.env` with the latest deployed Verifier address after each deployment.
+
+## 4. Deployment & NeAlways verify the deployer address and network before deploying:
+  ```js
+  const [deployer] = await hre.ethers.getSigners();
+  console.log("Deploying with:", deployer.address, "on network", hre.network.name);
+  ```
+- Ensure the Hardhat config uses the correct endpoint for the target network (e.g., Sepolia, not mainnet).
+- Deployer account must have suffici# 5. atibility
+
+- For Ethers v6:
+  - Use `await contract.deployed;` (not `.deployed()`)
+  - Use `contract.target` for the deployed address (not `.address`).
+
+## 6. Automation & Documentation
+
+- Automate the full workflow (circuit build, trusted setup, input/witness/proof, contract compile, deployment) with a single npm script.
+- Document every step and update the README after any workflow change or error fix.
+- Keep rules DRY: Reference this rule in all scripts and documentation; update when new patterns or errors emerge.
+
+## 7. General Best Practices
+
+- Never use artifacts, scripts, or contracts from different circuit versions together.
+- Remove or rename duplicate Verifier contracts to avoid confusion.
+- Test cross-stack consistency (JS ↔ Circom ↔ Solidity) for all cryptographic operations.
+- Update rules and documentation after every major error or workflow improvement.
+
+---

@@ -1,0 +1,80 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: Best practices and standards for Solidity smart contracts in the ZK Mixer project.
+globs: contracts/**/*.sol
+alwaysApply: true
+---
+
+## 1. General Principles
+
+- Use the latest stable Solidity version (e.g., `^0.8.20`) and keep pragma consistent across all contracts.
+- Follow the Checks-Effects-Interactions pattern to prevent reentrancy.
+- Prioritize security and clarity over micro-optimizations, but be mindful of gas costs.
+
+## 2. Naming & Structure
+
+- Use `UpperCamelCase` for contracts, interfaces, libraries, and events.
+- Use `mixedCase` for functions, state variables, and parameters.
+- Use `ALL_CAPS_SNAKE_CASE` for constants.
+- Prepend parameters with an underscore (`_`).
+- Order: Imports, Type declarations, State variables, Events, Modifiers, Constructor, receive/fallback, external/public/internal/private functions.
+
+## 3. Security Best Practices
+
+- Validate all inputs with `require()` or custom errors at the start of functions.
+- Implement access control where necessary (e.g., OpenZeppelin's `Ownable`).
+- Use OpenZeppelin's `ReentrancyGuard` if needed.
+- Use checked arithmetic (default in Solidity >=0.8); use `unchecked` only when safe and documented.
+
+## 4. Gas Optimization
+
+- Minimize state variable writes.
+- Use `immutable` for constructor-only variables and `constant` for compile-time constants.
+- Prefer `calldata` for external function parameters.
+- Cache state variables in local memory if read multiple times.
+
+## 5. Error Handling
+
+- Prefer custom errors over `require` strings for gas efficiency and clarity.
+- Use descriptive error names (e.g., `InvalidProof`, `NullifierAlreadySpent`).
+
+## 6. Documentation
+
+- Use NatSpec comments (`///` or `/** ... */`) for all public/external contracts, functions, events, and state variables.
+- Include `@title`, `@notice`, `@dev`, `@param`, `@return`.
+
+## 7. ZK Mixer Specifics
+
+- **Merkle Trees:**  
+  - Ensure Merkle tree logic and `ZERO_VALUE` are consistent with off-chain and circuit logic.
+  - Tree height constant must match the circuit.
+- **Verifier & Proofs:**  
+  - Use the generated `Verifier.sol` for on-chain verification.
+  - Public inputs array in `ZKMixer.withdraw` must match the circuit’s `public [...]` order and format.
+  - Pass proof data as `calldata`.
+- **Commitments & Nullifiers:**  
+  - Use `bytes32` consistently.
+  - Ensure Poseidon hash function matches JS and Circom (test this explicitly).
+  - Follow Checks-Effects-Interactions for nullifier spending.
+- **Fixed Denomination:**  
+  - Use a `DENOMINATION` constant; check `msg.value`.
+- **Relayer Logic:**  
+  - Validate inputs; transfer to recipient first.
+
+## 8. Testing
+
+- Aim for high test coverage using Hardhat (Mocha/Chai).
+- Test edge cases, access control, failure conditions, and event emissions.
+- Include hash consistency tests between Solidity, JS, and Circom.
+
+## 9. Dependencies
+
+- Use audited libraries (e.g., OpenZeppelin).
+- For critical cryptographic libraries (e.g., Poseidon), copy source to `contracts/libraries/` and import locally.
+- Use static linking for libraries in deployment/tests.
+
+---

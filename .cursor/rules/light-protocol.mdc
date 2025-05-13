@@ -1,0 +1,44 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: Standards and best practices for using ZK Compression and compressed accounts in Light Protocol on Solana.
+globs: ["external/light-protocol/**", "programs/**/*.rs", "js/stateless.js/**", "docs/light protocol/**"]
+alwaysApply: true
+---
+
+# ZK Compression & Light Protocol Rule
+
+- **Compressed Account Model**
+  - Use compressed accounts to store ZK state efficiently and scalably on Solana.
+  - Each compressed account is identified by its hash, not by a private key.
+  - Each write to a compressed account changes its hash.
+  - The `address` field is optional and should only be used when uniqueness is required (e.g., NFTs, PDAs).
+
+- **State Trees**
+  - All compressed accounts are stored in sparse state trees.
+  - Only the tree root is stored on-chain, minimizing storage costs.
+  - Each compressed account hash includes the tree's address and leaf index, ensuring global uniqueness.
+
+- **Layout and Discriminator**
+  - The compressed account layout includes: Discriminator, Data, DataHash.
+  - The discriminator (first 8 bytes) allows distinguishing between account types (Anchor pattern).
+
+- **Best Practices**
+  - Use the `address` field only if you need strict uniqueness.
+  - For fungible state, identify accounts by their hash only.
+  - Whenever you modify a compressed account's state, remember that its hash will change and you'll need to update any references.
+
+- **Development and Testing**
+  - Consult the official examples and "State Trees" section to understand the workflow.
+  - Use the official JS/TS SDK to interact with the protocol from scripts and tests.
+  - For advanced logic, review the Anchor integration and compressed account structure.
+
+- **References**
+  - [Solana ZK Compression Docs](https://spl.solana.com/account-compression)
+  - [Light Protocol Developer Content](../docs/light protocol/developer-content/)
+  - [Compressed Account Model](docs/light protocol/developer-content/compression-docs/learn/core-concepts/compressed-account-model.md)
+
+---

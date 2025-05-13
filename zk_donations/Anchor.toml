@@ -1,0 +1,18 @@
+[toolchain]
+
+[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+zk_donations = "9PY5ThauBNu2GJCKmeP5y8LN6zbNvEdXnVaKwnvHGZCW"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = "/home/zyrav23reborned/.config/solana/id.json"
+
+[scripts]
+test = "yarn run mocha -t 1000000 tests/"

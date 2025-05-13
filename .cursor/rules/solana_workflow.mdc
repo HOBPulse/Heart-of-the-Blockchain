@@ -1,0 +1,100 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: Workflow, best practices, and standards for ZK development on Solana using Anchor, Rust, WASM, and Light Protocol. Covers account compression, Merkle trees, ZK proof integration, and developer tooling.
+globs: ["external/light-protocol/**", "programs/**/*.rs", "prover/**", "js/stateless.js/**"]
+alwaysApply: true
+---
+
+# Solana & Light Protocol ZK Workflow Rules
+
+## 1. Project Structure & Environment
+
+- **Directory Structure**
+  - Use `/programs` for Anchor smart contracts (Rust).
+  - Use `/prover` for ZK proof generation servers/clients (Go, Rust).
+  - Use `/js` or `/js/stateless.js` for JS/TS SDKs and integration tests.
+  - Use `/examples` for minimal working demos (Anchor, browser, node).
+  - Use `/tasks` for project management and progress tracking.
+
+- **Environment Setup**
+  - Install Rust (stable + nightly), Anchor, Node.js (LTS), and WASM toolchain.
+  - Use provided scripts (`install.sh`, `devenv.sh`) for reproducible setup.
+  - Prefer development containers or scripts for consistent environments.
+
+## 2. Anchor Program Development
+
+- **Account Compression**
+  - Use Light Protocol's account compression primitives for scalable state.
+  - Store only Merkle roots or compressed state on-chain; keep full data off-chain or in logs.
+  - Use zero-copy patterns for efficient account serialization/deserialization.
+
+  - **Merkle Trees**
+  - Use concurrent Merkle tree structures (`ConcurrentMerkleTree`) with Poseidon hash.
+  - Always initialize empty nodes with the agreed ZERO_VALUE (Poseidon(0,0)).
+  - For public state, use `StateMerkleTreeAccount` and related helpers.
+  - Document tree height, padding, and hash function in code and tests.
+
+- **UTXO/Ownership Notes**
+  - For privacy, implement UTXO-style notes (ownership tokens) as in Light Protocol.
+  - Store commitments in the Merkle tree; use nullifiers to prevent double-spending.
+
+## 3. ZK Proof Integration
+
+- **Proof Generation**
+  - Use the `/prover` server/client for off-chain ZK proof generation (Groth16, Plonk, etc.).
+  - Integrate proof requests from JS/TS SDK or directly from Anchor tests.
+  - Use Poseidon hash for all cryptographic operations to ensure consistency.
+
+- **On-Chain Verification**
+  - Verify ZK proofs in Anchor programs using Light Protocol's verifier libraries.
+  - Ensure public inputs (roots, nullifiers, etc.) match the circuit and off-chain logic.
+  - Document the mapping between circuit public inputs and on-chain verification.
+
+## 4. Testing & Tooling
+
+- **Unit & Integration Tests**
+  - Write Rust tests in `/tests` for Anchor programs.
+  - Use JS/TS tests for SDK and cross-stack integration.
+  - Run `cargo test` and `pnpm test` regularly.
+
+- **End-to-End Demos**
+  - Use `/examples` to demonstrate full deposit-proof-withdraw flows.
+  - Document setup and expected results for each example.
+
+- **CI/CD**
+  - Automate tests and builds using GitHub Actions or similar.
+  - Ensure all tests pass before merging or deploying.
+
+## 5. Security & Auditing
+
+- **Formal Verification**
+  - Use Light Protocol's formally verified circuits and audited libraries where possible.
+  - Reference audit reports and verification status in documentation.
+
+- **Best Practices**
+  - Validate all inputs and state transitions.
+  - Use access control and error handling as per Anchor and Solana standards.
+  - Monitor for new vulnerabilities in dependencies.
+
+## 6. Documentation & Standards
+
+- **Code Comments & Docs**
+  - Document all public functions, account structures, and ZK integration points.
+  - Reference this rule in all relevant files and READMEs.
+
+- **Cross-Stack Consistency**
+  - Ensure Merkle logic, hash functions, and proof formats are consistent across Rust, Go, JS, and circuits.
+  - Maintain test vectors and reference values for critical hashes and roots.
+
+- **References**
+  - See also: `merkle_tree_rules.mdc`, `zk_workflow.mdc`, Light Protocol docs, Anchor book, Solana docs.
+
+  ---
+
+**Note:**  
+Adapt and expand this rule while stack evolves or while new tools/protocols are being implemented in Solana/ZK workflow.
+
