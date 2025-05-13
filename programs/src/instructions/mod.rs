@@ -9,3 +9,6 @@ pub use init_doner::*;
 
 pub mod donate;
 pub use donate::*;
+
+pub mod donate_compressed;
+pub use donate_compressed::*;

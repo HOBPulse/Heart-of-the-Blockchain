@@ -1,199 +1,420 @@
-# Light Protocol ZK Compression Integration Plan
+# Light Protocol ZK Compression Implementation
 
-## Objective
-Integrate the Light Protocol SDK (ZK Compression) into the Solana donation campaign system to reduce on-chain storage costs, scale the system, and maintain L1 security and composability.
+## Overview
 
----
+This document details the implementation of Light Protocol's zero-knowledge (ZK) compression in the Heart of Blockchain project. The integration enables efficient storage of donation data while maintaining privacy and verifiability.
 
-## Previous Stack (Donation Flow)
+## Architecture
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Program as House of Blockchain Program
-    participant Campaign as Campaign Account
-    participant Token as Token Account
-
-    User->>Program: Create Campaign
-    Program->>Campaign: Initialize Account
-    
-    User->>Program: Donate
-    Program->>Token: Transfer Tokens
-    Program->>Campaign: Update Donation Records
-
-    User->>Program: Withdraw
-    Program->>Campaign: Verify Owner & Target Met
-    Campaign->>Program: Validate Withdraw
-    Program->>User: Transfer Funds
-```
-
----
-
-## New Stack with Light Protocol ZK Compression
+The Heart of Blockchain platform leverages Light Protocol's ZK compression through a multi-layered approach:
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Client as Client (Light SDK)
-    participant Program as House of Blockchain Program
+    participant Client as Client SDK
+    participant Program as Heart of Blockchain Program
     participant Light as Light Protocol Program
     participant Campaign as Campaign Account
     participant Token as Token Account
 
-    User->>Client: Donate (input)
-    Client->>Light: Generate ZK Proof & Prepare Merkle Update
-    Client->>Program: donate_compressed_amount (proof, data)
+    User->>Client: Initiate Donation
+    Client->>Client: Generate ZK Proof
+    Client->>Program: Submit Donation Transaction with Proof
     Program->>Light: CPI: Verify Proof & Update Merkle Tree
     Light->>Campaign: Update Merkle Root
-    Program->>Token: Transfer Tokens (if applicable)
+    Program->>Token: Transfer Tokens
+    Program->>User: Return Receipt
 
-    User->>Client: Withdraw (input)
-    Client->>Program: withdraw_compressed (proof, data)
-    Program->>Light: CPI: Verify Proof & Merkle Inclusion
-    Light->>Campaign: Validate Withdraw
-    Program->>User: Transfer Funds
+    User->>Client: Request Donation History
+    Client->>Light: Query Compressed State
+    Light->>Client: Return Compressed Donation Data
+    Client->>Client: Decompress Data
+    Client->>User: Display Donation History
 ```
 
----
+## Implementation Components
 
-## Implementation Phases
+### 1. On-Chain Program (Solana Smart Contract)
 
-### 1. Research and Environment Setup
-- **(Done)** Review official Light Protocol and ZK Compression documentation.
-  - **Key Findings:** State stored on ledger via Merkle Tree account managed by Light's Account Compression Program (`compr6...`). On-chain program needs CPIs to create tree (`init_campaign`) and append leaves (`donate_compressed`). Append CPI requires off-chain generated ZK validity proof via SDK. SDK uses `getAsset`/`getAssetProof` RPC methods. ZK-compatible RPC (e.g., Helius) mandatory. Cost shifts from rent to tx fees.
-- **(Done)** Install and configure the Light Protocol SDK and CLI.
-  - **Steps:**
-    1. Clone the official Light Protocol repository into `external/light-protocol` (already done).
-    2. Install dependencies and setup the environment:
-       ```bash
-       cd external/light-protocol
-       ./scripts/install.sh
-       ```
-       - For full production keys (optional):
-         ```bash
-         ./scripts/install.sh --full-keys
-         ```
-    3. Activate the development environment:
-       ```bash
-       ./scripts/devenv.sh
-       ```
-    4. (Optional) Build the project:
-       ```bash
-       ./scripts/build.sh
-       ```
-    5. (Optional) Run tests:
-       ```bash
-       ./scripts/test.sh
-       ```
-  - **Notes:**
-    - All dependencies will be installed in `.local` inside the repo, so they won't interfere with global installations.
-    - You can use `pnpm`, `cargo`, `solana`, etc., from within the activated environment.
-    - For SDK usage in your project, reference the code in `external/light-protocol/js/`.
-- **(Done)** Ensure access to a compatible RPC (e.g., Helius) and a working local/testnet environment.
-  - **RPC Provider:** Helius (Devnet)
-  - **Endpoint:**
-    ```
-    https://devnet.helius-rpc.com/?api-key=0671b636-b70b-4071-9750-ab6f88409879
-    ```
-  - **How to use:**
-    - Set this endpoint in your environment variables or configuration files for both the Light Protocol SDK and CLI.
-    - Example for SDK (TypeScript):
-      ```typescript
-      const connection = new Connection('https://devnet.helius-rpc.com/?api-key=0671b636-b70b-4071-9750-ab6f88409879');
-      ```
-    - Example for CLI (if required):
-      ```bash
-      export HELIUS_RPC_URL='https://devnet.helius-rpc.com/?api-key=0671b636-b70b-4071-9750-ab6f88409879'
-      ```
-  - **Test Environment:**
-    - All development and integration tests will be run against Solana Devnet using this endpoint.
+#### Campaign State with Merkle Root
 
-### 2. On-Chain Program Modification
-- **(Next)** Implement CPI to Light Protocol for tree creation in `initialize_campaign`.
-- **(Pending)** Add Merkle root field to campaign state.
-- **(Pending)** Adapt instructions to accept ZK proofs and update compressed state.
+```rust
+#[account]
+pub struct Campaign {
+    pub id: u64,
+    pub creator: Pubkey,
+    pub title: String,
+    pub description: String,
+    pub target_amount: u64,
+    pub current_amount: u64,
+    pub donation_count: u64,
+    pub merkle_root: [u8; 32],  // Stores the Merkle root for compressed donations
+    pub merkle_tree: Pubkey,    // Address of the Merkle tree account
+    pub status: CampaignStatus,
+}
+```
 
-### 3. Compressed Donation Instruction
-- Create or modify the donation instruction to accept ZK proofs and update the Merkle tree via Light Protocol.
-- Validate and update the root in the campaign account.
+#### Light Protocol CPI for Tree Creation
 
-### 4. Client SDK Integration
-- Use the Light Protocol SDK to generate ZK proofs and build transactions.
-- Configure the client to use a compatible RPC.
-- Send transactions with proofs and required accounts.
+```rust
+pub fn initialize_campaign(
+    ctx: Context<InitializeCampaign>,
+    id: u64,
+    title: String,
+    description: String,
+    target_amount: u64,
+) -> Result<()> {
+    // Initialize campaign state
+    let campaign = &mut ctx.accounts.campaign;
+    campaign.id = id;
+    campaign.creator = ctx.accounts.creator.key();
+    campaign.title = title;
+    campaign.description = description;
+    campaign.target_amount = target_amount;
+    campaign.current_amount = 0;
+    campaign.donation_count = 0;
+    campaign.merkle_root = [0; 32];  // Initialize with empty root
+    campaign.merkle_tree = ctx.accounts.merkle_tree.key();
+    campaign.status = CampaignStatus::Active;
+    
+    // Create Merkle tree via CPI to Light Protocol
+    let cpi_program = ctx.accounts.light_protocol_program.to_account_info();
+    let cpi_accounts = light_protocol::cpi::accounts::InitializeTree {
+        authority: ctx.accounts.creator.to_account_info(),
+        merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
+        system_program: ctx.accounts.system_program.to_account_info(),
+    };
+    
+    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+    light_protocol::cpi::initialize_tree(
+        cpi_ctx,
+        MERKLE_TREE_HEIGHT,
+        MERKLE_TREE_CAPACITY,
+    )?;
+    
+    Ok(())
+}
+```
 
-### 5. Compressed Data Query and Display
-- Use Light Protocol RPC methods to query compressed state and display donation history.
+#### Compressed Donation Handling
 
-### 6. Testing, Audit, and Deployment
-- Unit, integration, and end-to-end tests.
-- Security audit and mainnet deployment.
+```rust
+pub fn donate_compressed(
+    ctx: Context<DonateCompressed>,
+    amount: u64,
+    proof_data: Vec<u8>,
+) -> Result<()> {
+    // Verify proof via Light Protocol CPI
+    let cpi_program = ctx.accounts.light_protocol_program.to_account_info();
+    let cpi_accounts = light_protocol::cpi::accounts::VerifyProof {
+        verifier: ctx.accounts.verifier.to_account_info(),
+        merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
+    };
+    
+    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+    light_protocol::cpi::verify_proof(cpi_ctx, proof_data.clone())?;
+    
+    // Extract donation data from proof
+    let donation_data = extract_donation_from_proof(&proof_data)?;
+    
+    // Update campaign state
+    let campaign = &mut ctx.accounts.campaign;
+    campaign.current_amount = campaign.current_amount.checked_add(amount)
+        .ok_or(ProgramError::ArithmeticOverflow)?;
+    campaign.donation_count = campaign.donation_count.checked_add(1)
+        .ok_or(ProgramError::ArithmeticOverflow)?;
+    
+    // Update Merkle tree via CPI
+    let cpi_program = ctx.accounts.light_protocol_program.to_account_info();
+    let cpi_accounts = light_protocol::cpi::accounts::AppendLeaf {
+        authority: ctx.accounts.donor.to_account_info(),
+        merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
+    };
+    
+    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+    let new_root = light_protocol::cpi::append_leaf(cpi_ctx, donation_data.to_leaf_hash())?;
+    
+    // Update campaign with new Merkle root
+    campaign.merkle_root = new_root;
+    
+    // Emit donation event
+    emit!(DonationEvent {
+        campaign_id: campaign.id,
+        amount,
+        donor: ctx.accounts.donor.key(),
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+    
+    Ok(())
+}
+```
 
----
+### 2. Client SDK Implementation
 
-## Current Status
-- [X] Phase 1: Research and environment setup - Done.
-- [X] Phase 2: On-chain program modification - In Progress.
-  - [ ] Subtask 2.1: Implement `initialize_campaign` CPI - In Progress (Next Step).
-  - [ ] ... (Other subtasks for Phase 2)
-- [ ] Phase 3: Compressed donation instruction - Pending.
-- [ ] Phase 4: Client SDK integration - Pending.
-- [ ] Phase 5: Compressed data query - Pending.
-- [ ] Phase 6: Testing and deployment - Pending.
+#### LightProtocolService
 
----
+Primary service for interacting with Light Protocol:
 
-This document will be updated at every major project milestone to reflect the real status and technical decisions taken.
+```typescript
+export class LightProtocolService {
+  private rpc: RpcConnection;
+  private connection: Connection;
+  private program: Program | null = null;
+  
+  constructor(config: LightProtocolConfig = {}) {
+    // Initialize connection to Solana and Light Protocol
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.connection = new Connection(this.config.rpcUrl, this.config.commitment);
+    this.rpc = createRpc(this.config.rpcUrl);
+  }
+  
+  async initializeProgram(wallet: Wallet): Promise<Program> {
+    // Load program from IDL and initialize
+    const provider = new AnchorProvider(this.connection, wallet, {
+      commitment: this.config.commitment
+    });
+    
+    const idlPath = path.resolve(this.config.idlPath);
+    const idl = JSON.parse(fs.readFileSync(idlPath, 'utf8'));
+    
+    this.program = new Program(idl, this.config.programId, provider);
+    return this.program;
+  }
+  
+  // Additional utility methods
+}
+```
 
----
+#### MerkleProofService
 
-## On-Chain Program: zk_donations (Anchor)
+Manages Merkle state and proof operations:
 
-### Initial Structure
-- **Location:** `programs/zk_donations/`
-- **Framework:** Anchor (latest stable)
-- **Language:** Rust
-- **Test Suite:** JavaScript (recommended: upgrade Node.js to >= 20.18.0)
+```typescript
+export class MerkleProofService {
+  private lightService: LightProtocolService;
+  private stateCache: Map<string, any> = new Map();
+  private proofCache: Map<string, MerkleProof> = new Map();
+  
+  constructor(
+    lightService: LightProtocolService,
+    options: MerkleProofOptions = {}
+  ) {
+    this.lightService = lightService;
+    this.options = { ...DEFAULT_OPTIONS, ...options };
+  }
+  
+  async fetchMerkleState(treeId: string, forceRefresh = false): Promise<any> {
+    // Implementation with caching and retry logic
+    const cacheKey = `state:${treeId}`;
+    
+    if (this.options.useCache && !forceRefresh && this.stateCache.has(cacheKey)) {
+      return this.stateCache.get(cacheKey);
+    }
+    
+    let retries = 0;
+    
+    while (retries < this.options.maxRetries) {
+      try {
+        const state = await this.lightService.getRpc().getCompressedState(treeId);
+        
+        if (this.options.useCache) {
+          this.stateCache.set(cacheKey, state);
+        }
+        
+        return state;
+      } catch (error) {
+        retries++;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    throw new Error(`Failed to fetch Merkle state after ${this.options.maxRetries} attempts`);
+  }
+  
+  async generateProof(
+    treeId: string,
+    leafIndex: number,
+    leafData: string,
+    options: { forceRefresh?: boolean } = {}
+  ): Promise<MerkleProof> {
+    // Implementation with caching
+    const cacheKey = `proof:${treeId}:${leafIndex}:${leafData}`;
+    
+    if (this.options.useCache && !options.forceRefresh && this.proofCache.has(cacheKey)) {
+      return this.proofCache.get(cacheKey)!;
+    }
+    
+    const state = await this.fetchMerkleState(treeId, options.forceRefresh);
+    const proof = await this.lightService.getRpc().generateProof(state, leafIndex, leafData);
+    
+    if (this.options.useCache) {
+      this.proofCache.set(cacheKey, proof);
+    }
+    
+    return proof;
+  }
+  
+  // Additional methods for proof verification and cache management
+}
+```
 
-### Security Rationale
-- All instructions will use strict account validation (Anchor constraints).
-- Only authorized signers can initialize or modify campaigns.
-- Checked arithmetic and explicit error handling will be enforced.
-- Minimal account mutability and CPI scope.
-- Anchor's best practices for seeds, bump, and PDA derivation will be followed.
-- All public functions and state will be documented with Rust doc comments.
+#### TransactionService
 
-### First Secure Instruction: initialize_campaign
-- **Purpose:**
-  - Create a new campaign account (PDA) for the user.
-  - Create a new Merkle tree (State Merkle Tree Account) via CPI to Light Protocol's account compression program.
-  - Store the Merkle tree account address in the campaign state.
-- **Accounts:**
-  - `[signer]` User (initializer)
-  - `[writable]` Campaign (PDA, derived from user and campaign id)
-  - `[writable]` State Merkle Tree Account (created via CPI)
-  - `system_program`, `rent`, and Light Protocol's account compression program
-- **Arguments:**
-  - Campaign id (u64), title (String), description (String), Merkle tree params (depth, buffer size)
-- **Security:**
-  - Only the initializer can create their campaign.
-  - All CPIs are checked for success; errors are bubbled up.
-  - Merkle tree params are validated to prevent DoS or excessive resource use.
-- **References:**
-  - [Anchor CPI docs](https://book.anchor-lang.com/chapter_8/)
-  - [Light Protocol account compression CPI example](https://github.com/Lightprotocol/light-protocol)
+Builds and sends transactions with proofs:
 
-### Node.js Version Recommendation
-- For Anchor JS tests and Solana compatibility, use Node.js >= 20.18.0.
-- You can upgrade with:
-  ```bash
-  nvm install 20.18.0
-  nvm use 20.18.0
-  ```
+```typescript
+export class TransactionService {
+  private lightService: LightProtocolService;
+  private merkleService: MerkleProofService;
+  private pendingTransactions: Map<string, TransactionStatus> = new Map();
+  
+  constructor(
+    lightService: LightProtocolService,
+    merkleService?: MerkleProofService
+  ) {
+    this.lightService = lightService;
+    this.merkleService = merkleService || new MerkleProofService(lightService);
+  }
+  
+  async buildTransactionWithProof(
+    proof: MerkleProof,
+    recipient: PublicKey,
+    amount: number
+  ): Promise<Transaction> {
+    const transaction = new Transaction();
+    const instructions = await this.createProofInstructions(proof, recipient, amount);
+    transaction.add(...instructions);
+    return transaction;
+  }
+  
+  async sendTransaction(
+    transaction: Transaction,
+    signers: Signer[],
+    options: TransactionOptions = {}
+  ): Promise<TransactionResult> {
+    const connection = this.lightService.getConnection();
+    const defaultOptions = {
+      confirmOptions: { commitment: 'confirmed' as Commitment },
+      skipPreflight: false,
+      maxRetries: 3
+    };
+    
+    const mergedOptions = { ...defaultOptions, ...options };
+    
+    let currentRetry = 0;
+    
+    while (currentRetry <= mergedOptions.maxRetries) {
+      try {
+        const signature = await sendAndConfirmTransaction(
+          connection,
+          transaction,
+          signers,
+          mergedOptions.confirmOptions
+        );
+        
+        this.pendingTransactions.set(signature, TransactionStatus.CONFIRMED);
+        
+        return {
+          signature,
+          status: TransactionStatus.CONFIRMED
+        };
+      } catch (error) {
+        currentRetry++;
+        
+        if (currentRetry <= mergedOptions.maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * currentRetry));
+        }
+      }
+    }
+    
+    return {
+      signature: 'failed',
+      status: TransactionStatus.FAILED,
+      error: new Error('Transaction failed after multiple retries')
+    };
+  }
+  
+  // Additional methods for transaction status tracking and utilities
+}
+```
 
----
+## Donation Data Structure
 
-## Next Coding Step
-- Implement the `initialize_campaign` instruction in Rust, following the above security and integration guidelines.
-- Add Rust doc comments and Anchor constraints for all accounts and arguments.
-- Prepare a JavaScript test for campaign initialization. 
+Donations are compressed into a Merkle tree with the following leaf structure:
+
+```typescript
+interface DonationLeaf {
+  donor: PublicKey;     // Donor public key or commitment
+  amount: number;       // Donation amount
+  timestamp: number;    // Unix timestamp
+  campaignId: number;   // Campaign identifier
+}
+
+// Conversion to bytes for Merkle leaf
+function donationToBytes(donation: DonationLeaf): Uint8Array {
+  const buffer = new Uint8Array(80); // 32 + 8 + 8 + 4 + padding
+  
+  buffer.set(donation.donor.toBytes(), 0);
+  new BigNumber(donation.amount).toArrayLike(Uint8Array, 'le', 8).forEach((b, i) => {
+    buffer[32 + i] = b;
+  });
+  new BigNumber(donation.timestamp).toArrayLike(Uint8Array, 'le', 8).forEach((b, i) => {
+    buffer[40 + i] = b;
+  });
+  new BigNumber(donation.campaignId).toArrayLike(Uint8Array, 'le', 4).forEach((b, i) => {
+    buffer[48 + i] = b;
+  });
+  
+  return buffer;
+}
+```
+
+## Performance Optimizations
+
+1. **Caching Strategy**:
+   - Merkle state caching with configurable TTL
+   - Proof caching for frequently accessed data
+   - Conditional fetch with force refresh option
+
+2. **Batch Processing**:
+   - Support for multiple leaf operations when possible
+   - Optimized transaction building for multiple operations
+
+3. **Error Handling & Retry Logic**:
+   - Configurable retry policies with exponential backoff
+   - Detailed error categorization and recovery strategies
+
+## Security Considerations
+
+1. **Proof Verification**:
+   - All proofs are verified on-chain before state updates
+   - Double verification in client and on-chain for critical operations
+
+2. **Access Control**:
+   - Strict permission checks for campaign management
+   - Only authorized users can update trees via CPI
+
+3. **Merkle Tree Integrity**:
+   - Root consistency checked on every update
+   - Historical roots maintained for auditability
+
+## Future Enhancements
+
+1. **Advanced Privacy Features**:
+   - Zero-knowledge donations with hidden amounts
+   - Stealth addressing for enhanced donor privacy
+
+2. **Performance Improvements**:
+   - Parallel proof generation for high-volume scenarios
+   - Optimized serialization/deserialization
+
+3. **Cross-Chain Support**:
+   - Abstraction layer for multiple ZK-enabled blockchains
+   - Bridge support for multi-chain donations
+
+## Reference Implementation
+
+For full implementation details, refer to:
+- Client SDK code in `client/src/services/`
+- On-chain program code in `programs/zk_donations/src/`
+- Integration tests in `tests/` 

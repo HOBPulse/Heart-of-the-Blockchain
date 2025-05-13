@@ -4,6 +4,7 @@ import { HeartOfBlockchain } from "../target/types/heart_of_blockchain";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { getOrCreateAssociatedTokenAccount, mintTo, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
+import { assert } from "chai";
 
 
 let provider = anchor.AnchorProvider.env();
@@ -95,6 +96,12 @@ describe("heart_of_blockchain", () => {
     }).signers([creator]).rpc();
 
     console.log(`Transaction Signature: ${tx}`);
+    
+    // Fetch the campaign account data and verify merkle_root is initialized to zeros
+    const campaignAccount = await program.account.campaignInfo.fetch(campaignAccountInfo);
+    assert.equal(campaignAccount.title, campaignTitle);
+    assert.equal(campaignAccount.description, campaignDescription);
+    assert.deepEqual(campaignAccount.merkleRoot, Array(32).fill(0));
   });
 
   it("Initialize doner", async () => {

@@ -26,4 +26,8 @@ pub mod heart_of_blockchain {
     pub fn donate_amount(ctx: Context<DonateAmount>, campaign_id: u64, title: String, donation_amount: u64) -> Result<()> {
         ctx.accounts.donate_amount(campaign_id, title, donation_amount)
     }
+    
+    pub fn donate_compressed(ctx: Context<DonateCompressed>, campaign_id: u64, title: String, proof_data: Vec<u8>) -> Result<()> {
+        ctx.accounts.donate_compressed(campaign_id, title, proof_data)
+    }
 }

@@ -17,6 +17,6 @@ no-log-ix-name = []
 sbf-out-dir = ["no-entrypoint"]
 
 [dependencies]
-anchor-lang = "0.29.0"
+anchor-lang = "0.31.0"
 # Add Light Protocol Account Compression crate dependency
 account-compression = { path = "../../../external/light-protocol/programs/account-compression", features = ["cpi"] }
