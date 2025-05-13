@@ -190,7 +190,7 @@ The project has been implemented in a systematic approach following these milest
    - Created donation history components
    - Built data visualization elements
 
-6. ⏳ **Testing, Audit & Deployment**:
+6. ✅ **Testing e2e-unity, static+dinamic audit & Documentation**:
    - Comprehensive test suite development
    - Security auditing
    - Mainnet deployment preparation
