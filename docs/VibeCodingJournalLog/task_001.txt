@@ -1,0 +1,31 @@
+# Task ID: 1
+# Title: Light Protocol Research and Environment Setup
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Investigate Light Protocol ZK Compression, set up SDK/CLI, and configure compatible RPC.
+# Details:
+Review docs, install dependencies, and ensure local/testnet environment supports Light Protocol.
+
+# Test Strategy:
+Able to run example CLI/SDK commands and connect to a ZK Compression-enabled RPC.
+
+# Subtasks:
+## 1. Research Light Protocol ZK Compression Documentation [done]
+### Dependencies: None
+### Description: Conduct comprehensive research on Light Protocol's ZK compression technology, understanding its architecture, capabilities, and use cases.
+### Details:
+Review the official Light Protocol documentation at docs.lightprotocol.com. Focus on understanding the core concepts of ZK compression, how it works with Solana, and the performance benefits it offers. Document key findings including compression ratios, gas savings, security properties, and limitations. Create a summary document outlining how Light Protocol fits into the project architecture and which specific features will be utilized.
+
+## 2. Install and Configure Light Protocol SDK and CLI [done]
+### Dependencies: 1.1
+### Description: Set up the Light Protocol development environment by installing the SDK and CLI tools required for ZK compression implementation.
+### Details:
+Install the Light Protocol SDK using npm/yarn with 'npm install @lightprotocol/zk-sdk' or equivalent command. Set up the CLI tools following the official installation guide. Verify installation by running basic test commands. Configure the SDK with project-specific parameters based on research findings from subtask 1. Create a simple test script that initializes the SDK and confirms proper configuration. Document the installation process and configuration options for team reference.
+
+## 3. Configure Compatible RPC and Test Environment [done]
+### Dependencies: 1.2
+### Description: Set up and test a development environment with compatible RPC endpoints that support Light Protocol operations on local and testnet environments.
+### Details:
+Identify RPC providers that support Light Protocol's ZK compression (check documentation for recommended providers). Configure local development environment with appropriate RPC endpoints. Set up a local test environment using Solana validator with Light Protocol extensions if available. Configure testnet connections for staging tests. Create and execute test scripts that verify the full workflow: connecting to RPC, performing basic ZK compression operations, and validating results. Document the RPC setup process, including any specific configuration parameters required for Light Protocol compatibility.
+

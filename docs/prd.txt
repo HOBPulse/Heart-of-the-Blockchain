@@ -1,0 +1,151 @@
+
+
+**Product Requirements Document: Light Protocol ZK Compression Integration**
+
+*   **Version:** 1.0
+*   **Status:** Proposed
+*   **Date:** 2024-07-26
+*   **Author:** AI Assistant
+
+**1. Introduction**
+
+The `heart_of_blockchain` Solana program currently manages donation campaigns, donors, and individual donations using standard Solana accounts. As the number of donations and potentially donors grows for each campaign, the cost associated with storing this state directly on-chain using Solana accounts (rent) becomes prohibitively expensive, limiting scalability. Light Protocol offers a ZK Compression primitive that allows storing state data on the cheaper Solana ledger while maintaining L1 security and composability via zero-knowledge proofs, significantly reducing storage costs. This document outlines the requirements and steps to integrate Light Protocol's ZK Compression into our system.
+
+**2. Goals**
+
+*   **Reduce On-Chain State Costs:** Significantly decrease the SOL cost associated with storing individual donation records.
+*   **Enhance Scalability:** Enable campaigns to handle a vastly larger number of donations without incurring excessive rent fees.
+*   **Maintain Core Functionality:** Ensure users can still initialize campaigns, donate, and potentially view donation history (though the method may change).
+*   **Preserve L1 Security & Composability:** Leverage Solana's base layer security and ensure the compressed state can interact with other Solana programs if needed in the future.
+
+**3. Non-Goals (for this iteration)**
+
+*   Implementing full privacy features (e.g., anonymous donations beyond basic compression).
+*   Compressing the primary `Campaign` state itself (likely small enough).
+*   Compressing `Doner` state (can be considered a future enhancement if donor lists become very large).
+*   Major UI/UX redesign beyond what's necessary to accommodate the new transaction flow.
+*   Implementing off-chain data retrieval indexing beyond what Light Protocol RPCs provide directly.
+
+**4. Proposed Solution**
+
+We will integrate Light Protocol's ZK Compression to manage individual donation records.
+
+1.  **On-Chain (`heart_of_blockchain` program):**
+    *   Each `Campaign` account will store a Merkle tree root representing the compressed state of all donations made to that campaign. This tree will be managed by the Light Protocol's on-chain programs.
+    *   The `donate_amount` instruction will be modified (or a new instruction `donate_compressed_amount` created) to:
+        *   Accept a ZK proof (generated off-chain) verifying the donation details and the state transition.
+        *   Perform a Cross-Program Invocation (CPI) to the appropriate Light Protocol on-chain program to:
+            *   Verify the ZK proof.
+            *   Update the campaign's Merkle tree with the new donation information (appending a new leaf).
+            *   Update the on-chain Merkle tree root stored in the `Campaign` account.
+    *   The `init_campaign` instruction will be modified to initialize the required Light Protocol state (e.g., create the initial Merkle tree via CPI).
+
+2.  **Off-Chain (Client-Side SDK / Application Logic):**
+    *   Integrate the Light Protocol TypeScript SDK.
+    *   Configure the client to use an RPC provider that supports the ZK Compression methods (e.g., Helius).
+    *   Modify the donation flow:
+        *   When a user initiates a donation, the client-side logic will use the Light Protocol SDK to:
+            *   Construct the donation data (amount, target campaign, etc.).
+            *   Generate the necessary ZK proof for the state update (this might involve interacting with a prover service or performing computations locally/off-chain depending on the SDK's design).
+            *   Build the Solana transaction invoking the modified `donate_amount` (or `donate_compressed_amount`) instruction, including the proof, necessary accounts (user, campaign, Light Protocol programs, root account), and signers.
+    *   Modify logic for reading donation history (if applicable) to use Light Protocol's RPC methods (`getCompressedAccount`, `getCompressedAccountProof`, etc.) to query the compressed state stored on the ledger, potentially requiring indexing solutions for efficient querying.
+
+**5. Detailed Requirements & Implementation Steps**
+
+**Phase 1: Setup & Research**
+
+1.  **Dependency Analysis:** Identify the specific Light Protocol Rust crates needed for on-chain CPIs and TypeScript/JS libraries for the client SDK.
+2.  **RPC Provider Setup:** Ensure access to a Solana RPC endpoint (Devnet and Mainnet) that supports Light Protocol ZK Compression methods (e.g., Helius).
+3.  **Documentation Review:** Thoroughly review Light Protocol's ZK Compression documentation (`zkcompression.com`), SDK examples, and on-chain program interfaces. Understand the proof generation process and required accounts for CPIs.
+4.  **Local Environment:** Set up a local Solana test validator environment capable of running Light Protocol programs (refer to Light Protocol repository/docs for setup).
+
+**Phase 2: On-Chain Program (`heart_of_blockchain`) Modifications**
+
+1.  **Update Dependencies:** Add necessary Light Protocol crates to `programs/Cargo.toml`.
+2.  **Modify State (`programs/src/state/campaign.rs`):**
+    *   Add a field to the `Campaign` struct to store the `Pubkey` of the Merkle tree account (or the root hash itself, depending on Light Protocol's pattern).
+    *   Potentially add fields for tree height/metadata if required by Light Protocol.
+3.  **Modify `init_campaign` (`programs/src/instructions/init_campaign.rs`):**
+    *   Add logic to perform a CPI to the Light Protocol program to initialize a new Merkle tree for the campaign.
+    *   Store the returned tree address/root in the `Campaign` account.
+4.  **Modify `donate_amount` or Create `donate_compressed_amount` (`programs/src/instructions/`):**
+    *   Define the instruction context (`Context`) to include required accounts:
+        *   User signer account.
+        *   `Campaign` account (mutable, to update root).
+        *   Light Protocol program(s).
+        *   Merkle tree account associated with the campaign (mutable).
+        *   Accounts required by the Light Protocol CPI (e.g., proof accounts, system program).
+    *   Modify the instruction handler function:
+        *   Accept the ZK proof and donation data as arguments.
+        *   Construct and execute the CPI call to the appropriate Light Protocol program function (e.g., `append_leaf`, `verify_and_update`).
+        *   Handle results/errors from the CPI.
+        *   Update the `Campaign` account's Merkle root based on the CPI result.
+5.  **Update `lib.rs`:** Expose the new/modified instructions.
+6.  **On-Chain Unit Tests (`tests/`):** Write tests using Anchor's framework to verify:
+    *   Correct CPI calls are made during `init_campaign`.
+    *   Correct CPI calls are made during `donate_amount`.
+    *   `Campaign` state (Merkle root) is updated correctly after a successful donation CPI.
+    *   Error handling for invalid proofs or failed CPIs.
+
+**Phase 3: Off-Chain Client/SDK Integration**
+
+1.  **Install SDK:** Add the Light Protocol TypeScript SDK (`@lightprotocol/zk-compression` or similar) to the client-side project (e.g., web app, script).
+2.  **Configure RPC Connection:** Update client-side Solana connection setup to use the ZK Compression-enabled RPC endpoint.
+3.  **Update Donation Logic:**
+    *   Refactor the existing donation function.
+    *   Use the Light Protocol SDK to prepare the donation data and generate the ZK proof off-chain.
+    *   Fetch the current Merkle tree state/proofs needed for the client-side proof generation via RPC.
+    *   Construct the Solana transaction using `@solana/web3.js` or Anchor TS, ensuring all required accounts (including those for Light Protocol) and the generated proof are passed to the `donate_compressed_amount` instruction.
+    *   Handle transaction signing and submission.
+4.  **Update Data Reading Logic (if applicable):**
+    *   If the client needs to display donation history, replace direct account fetching with calls to Light Protocol RPC methods (`getCompressedAccount`, `getCompressedAccountsByOwner`, etc.), potentially requiring parsing of ledger data and proofs.
+
+**Phase 4: Testing**
+
+1.  **Integration Tests:** Create end-to-end tests (e.g., using TypeScript and Anchor TS) that simulate the full user flow:
+    *   Initialize a campaign.
+    *   Use the client-side logic to generate a proof and call `donate_compressed_amount`.
+    *   Verify the transaction succeeds on the local validator/devnet.
+    *   Use Light Protocol RPC methods to verify the compressed donation state was correctly updated.
+2.  **Load Testing (Optional):** Simulate multiple concurrent donations to test performance and potential bottlenecks (proof generation, RPC limits).
+3.  **Devnet Testing:** Deploy the program and test the client application against the Solana Devnet using a supported RPC provider.
+
+**Phase 5: Deployment & Monitoring**
+
+1.  **Audit:** Consider a security audit, especially focusing on the integration points with Light Protocol and the handling of proofs/CPIs.
+2.  **Mainnet Deployment Strategy:** Plan the deployment, potentially including:
+    *   Deploying the updated on-chain program.
+    *   Updating client applications.
+    *   Migrating existing campaigns (if feasible/necessary - likely new campaigns would use compression).
+3.  **Monitoring:** Set up monitoring for:
+    *   Transaction success/failure rates for donation instructions.
+    *   Costs associated with transactions (compute units, fees).
+    *   RPC provider performance and availability.
+    *   On-chain program logs for errors.
+
+**6. Dependencies**
+
+*   Light Protocol ZK Compression SDK (TypeScript/JavaScript)
+*   Light Protocol On-Chain Programs (addresses needed for CPIs)
+*   Anchor Framework (Rust & TypeScript)
+*   Solana Tool Suite
+*   ZK Compression-Compatible Solana RPC Provider (e.g., Helius)
+*   Prover infrastructure/service (if required by the SDK for proof generation)
+
+**7. Risks & Challenges**
+
+*   **Complexity:** Integrating ZK proofs and CPIs adds significant technical complexity compared to standard account interactions.
+*   **Proof Generation:** Off-chain proof generation might be computationally intensive or require reliance on external prover services, potentially impacting user experience (latency) or adding operational costs/dependencies.
+*   **RPC Dependency:** Reliance on specialized RPC providers introduces a potential point of failure or bottleneck.
+*   **Debugging:** Debugging issues involving ZK proofs and CPIs across multiple programs can be challenging.
+*   **Auditing:** Ensuring the secure integration and correct handling of proofs is critical and requires careful auditing.
+*   **Evolving Technology:** Light Protocol is relatively new; its APIs and best practices may evolve.
+
+**8. Future Considerations**
+
+*   Compress Donor information using a separate Merkle tree per campaign.
+*   Explore using Light Protocol for other state-heavy features.
+*   Implement more advanced querying/indexing solutions for compressed data if basic RPC methods prove insufficient.
+*   Investigate Light Protocol's features beyond basic compression if relevant (e.g., specific ZK computation capabilities).
+
+---

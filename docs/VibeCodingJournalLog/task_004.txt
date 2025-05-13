@@ -1,0 +1,31 @@
+# Task ID: 4
+# Title: Client SDK Integration and Proof Generation
+# Status: done
+# Dependencies: 3
+# Priority: high
+# Description: Integrate Light Protocol SDK in the client, generate proofs, and build transactions.
+# Details:
+Use SDK to generate proofs, fetch Merkle state, and send transactions to the program.
+
+# Test Strategy:
+End-to-end test: user donates, proof is generated, transaction succeeds.
+
+# Subtasks:
+## 1. Integrate Light Protocol SDK into client application [done]
+### Dependencies: None
+### Description: Set up and configure the Light Protocol SDK in the client application to establish the foundation for proof generation and transaction building.
+### Details:
+Install the Light Protocol SDK via npm/yarn. Initialize the SDK with appropriate configuration parameters including network endpoints, commitment levels, and connection settings. Create a client-side service or utility class that will handle SDK interactions. Implement connection management and error handling for SDK operations. Test the basic SDK connection to ensure proper integration.
+
+## 2. Implement Merkle state fetching and proof generation [done]
+### Dependencies: 4.1
+### Description: Build functionality to fetch the current Merkle state from the Light Protocol and generate zero-knowledge proofs using the SDK.
+### Details:
+Use the integrated SDK to fetch the current Merkle tree state from Light Protocol. Implement the proof generation workflow using the SDK's proof generation methods. Create helper functions to prepare the necessary inputs for proof generation (e.g., private inputs, public inputs). Add caching mechanisms for Merkle state to optimize performance. Implement retry logic for failed proof generation attempts. Add logging for debugging proof generation issues. Create unit tests to verify proof generation with sample inputs.
+
+## 3. Build and send transactions with generated proofs [done]
+### Dependencies: 4.2
+### Description: Develop functionality to construct Solana transactions that include the generated proofs and send them to the program on-chain.
+### Details:
+Create transaction building utilities that incorporate the generated proofs into Solana transactions. Implement methods to serialize the proof data in the format expected by the on-chain program. Add transaction signing functionality using the user's wallet. Develop transaction submission logic with proper error handling and confirmation tracking. Implement transaction status monitoring to track the success/failure of submitted transactions. Create a user-friendly interface to display transaction status and results. Add comprehensive logging for transaction lifecycle events.
+

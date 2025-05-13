@@ -1,0 +1,114 @@
+# Task ID: 3
+# Title: Implement Compressed Donation Instruction
+# Status: done
+# Dependencies: 2
+# Priority: high
+# Description: Create or modify the donation instruction to use ZK proofs and update compressed state.
+# Details:
+Accept ZK proof, call Light Protocol to append leaf, update Merkle root in campaign, and maintain donation statistics.
+
+# Test Strategy:
+Test donations with valid/invalid proofs, verify Merkle root changes, and validate donation statistics updates.
+
+# Subtasks:
+## 1. Create ZK proof verification logic for donations [done]
+### Dependencies: None
+### Description: Implement the verification logic for zero-knowledge proofs submitted with donation instructions
+### Details:
+Create a function that takes a ZK proof as input and verifies its validity. This should include: 1) Deserializing the proof from the instruction data, 2) Validating the proof against the appropriate verification key, 3) Extracting the necessary public inputs from the proof (e.g., donation amount, donor identity commitment), and 4) Returning verification status and extracted data. Use Light Protocol's verification libraries for the actual proof verification.
+
+## 2. Implement compressed state update with Light Protocol [done]
+### Dependencies: 3.1
+### Description: Create the logic to append donation data as a leaf to the Merkle tree using Light Protocol
+### Details:
+After successful ZK proof verification, implement the functionality to: 1) Format the donation data as a leaf according to Light Protocol's requirements, 2) Call Light Protocol's append_leaf function with the appropriate parameters, 3) Handle any errors or exceptions from the Light Protocol call, and 4) Retrieve and temporarily store the updated Merkle root. This should be implemented as a separate function that takes the verified donation data from subtask 1 as input.
+
+<info added on 2025-05-13T16:07:58.283Z>
+Here's the additional technical implementation information:
+
+```rust
+// DonationLeaf struct for Merkle tree representation
+pub struct DonationLeaf {
+    pub donor: Pubkey,
+    pub amount: u64,
+    pub timestamp: i64,
+    pub campaign_id: u64,
+}
+
+// Serialization implementation
+impl DonationLeaf {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut data = Vec::with_capacity(32 + 8 + 8 + 8);
+        data.extend_from_slice(&self.donor.to_bytes());
+        data.extend_from_slice(&self.amount.to_le_bytes());
+        data.extend_from_slice(&self.timestamp.to_le_bytes());
+        data.extend_from_slice(&self.campaign_id.to_le_bytes());
+        data
+    }
+}
+
+// CPI call to Light Protocol with proper error handling
+pub fn append_donation_to_merkle_tree(
+    ctx: &Context<DonateCompressed>,
+    donation_leaf: &DonationLeaf
+) -> Result<[u8; 32]> {
+    let leaf_data = donation_leaf.to_bytes();
+    
+    // Hash the leaf data to get the leaf node
+    let leaf_node = keccak::hash(&leaf_data);
+    
+    // Prepare accounts for Light Protocol CPI
+    let cpi_program = ctx.accounts.light_protocol_program.to_account_info();
+    let cpi_accounts = light_protocol::cpi::accounts::BatchAppend {
+        authority: ctx.accounts.authority.to_account_info(),
+        merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
+        output_queue: ctx.accounts.output_queue.to_account_info(),
+    };
+    
+    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+    
+    // Call Light Protocol to append leaf
+    match light_protocol::cpi::batch_append(cpi_ctx, vec![leaf_node]) {
+        Ok(_) => {
+            // Extract and return the new Merkle root
+            let merkle_tree_data = ctx.accounts.merkle_tree.try_borrow_data()?;
+            let root_offset = 8; // Adjust based on Light Protocol's data structure
+            let mut root = [0u8; 32];
+            root.copy_from_slice(&merkle_tree_data[root_offset..root_offset+32]);
+            Ok(root)
+        },
+        Err(e) => {
+            msg!("Failed to append leaf to Merkle tree: {:?}", e);
+            Err(ProgramError::External.into())
+        }
+    }
+}
+```
+
+The implementation includes proper error propagation, efficient serialization, and follows Light Protocol's specific requirements for leaf formatting and tree updates.
+</info added on 2025-05-13T16:07:58.283Z>
+
+## 3. Update campaign state with new Merkle root [done]
+### Dependencies: 3.2
+### Description: Modify the campaign account to store the updated Merkle root after donation processing
+### Details:
+Complete the donation instruction by: 1) Retrieving the campaign account from the instruction context, 2) Updating the campaign's Merkle root with the new value obtained from Light Protocol, 3) Incrementing any necessary counters (e.g., total donations, total amount), 4) Implementing proper error handling for cases where the campaign doesn't exist or other state updates fail, and 5) Emitting appropriate events to notify clients of the successful donation. Ensure proper access controls are in place so only authorized instructions can update the campaign state.
+
+## 4. Enhance CampaignInfo struct for donation statistics [done]
+### Dependencies: 3.3
+### Description: Update the CampaignInfo struct to properly track donation statistics and Merkle roots
+### Details:
+Modify the CampaignInfo struct to include fields for tracking donation statistics such as total donation count, total amount donated, and historical Merkle roots. Ensure these fields are properly updated during the donation process.
+
+## 5. Implement comprehensive event emission [done]
+### Dependencies: 3.3
+### Description: Add event emission for donation-related activities
+### Details:
+Implement event emission for donation activities to allow clients to track donations in real-time. Events should include details such as campaign ID, donation amount, timestamp, and new Merkle root.
+
+## 6. Create comprehensive test suite [done]
+### Dependencies: 3.1, 3.2, 3.3
+### Description: Develop tests to verify all aspects of the compressed donation functionality
+### Details:
+Create a comprehensive test suite that covers: 1) ZK proof verification with valid and invalid proofs, 2) Leaf formatting and Merkle tree updates, 3) Campaign state updates including Merkle root and donation statistics, 4) Error handling for various edge cases, and 5) End-to-end donation flow tests.
+

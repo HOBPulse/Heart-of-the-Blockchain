@@ -1,0 +1,31 @@
+# Task ID: 5
+# Title: Compressed Data Query and Display
+# Status: done
+# Dependencies: 4
+# Priority: medium
+# Description: Implement logic to read and display compressed donation data using Light Protocol RPC.
+# Details:
+Use RPC methods to fetch compressed state and display donation history.
+
+# Test Strategy:
+Donation history is accurate and matches on-chain state.
+
+# Subtasks:
+## 1. Implement Light Protocol RPC Client Integration [done]
+### Dependencies: None
+### Description: Set up the client-side integration with Light Protocol's RPC endpoints to enable communication with the compressed data storage.
+### Details:
+Create a service class that handles the connection to Light Protocol's RPC endpoints. Implement methods to initialize the connection, handle authentication if needed, and manage the RPC session. Include error handling for connection issues and timeout scenarios. The service should expose a clean API that other components can use to make RPC calls.
+
+## 2. Develop Compressed Donation Data Fetching Logic [done]
+### Dependencies: 5.1
+### Description: Create functions to query and decompress donation data from Light Protocol's compressed state storage.
+### Details:
+Using the RPC client from subtask 1, implement specific query functions to fetch compressed donation records. Create data models to represent the donation information. Implement decompression algorithms or use Light Protocol's libraries to convert the compressed data into usable format. Include pagination support for handling large datasets and implement caching mechanisms to improve performance for frequently accessed data.
+
+## 3. Build Donation History UI Component [done]
+### Dependencies: 5.2
+### Description: Create a user interface component to display the fetched donation history in a readable and interactive format.
+### Details:
+Design and implement a UI component that displays donation history in a tabular or list format. Include sorting and filtering capabilities to allow users to organize the data. Implement loading states to indicate when data is being fetched. Add error handling to display user-friendly messages when data cannot be retrieved. Consider adding features like exporting data to CSV or printing options. Ensure the component is responsive and works well on different screen sizes.
+

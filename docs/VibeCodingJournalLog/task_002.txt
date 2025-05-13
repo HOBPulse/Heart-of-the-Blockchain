@@ -1,0 +1,37 @@
+# Task ID: 2
+# Title: On-Chain Program Modification for ZK Compression
+# Status: done
+# Dependencies: 1
+# Priority: high
+# Description: Modify the Solana program to support Merkle roots and CPIs to Light Protocol.
+# Details:
+Add Merkle root to Campaign state, implement CPI to Light Protocol for tree creation and updates, handle proofs.
+
+# Test Strategy:
+Unit tests for CPI calls, state updates, and error handling.
+
+# Subtasks:
+## 1. Add Merkle Root to Campaign State [done]
+### Dependencies: None
+### Description: Modify the Campaign state structure to include a Merkle root field that will store the root hash of the Merkle tree representing campaign data.
+### Details:
+Update the Campaign struct in the program's state module to add a new field for storing the Merkle root hash. This should be a 32-byte array field (e.g., [u8; 32]). Also update any initialization functions to properly initialize this field with zeros or a default value. Ensure all serialization and deserialization logic is updated to handle the new field. Finally, update any relevant tests to verify the new state structure works correctly.
+
+## 2. Implement CPI to Light Protocol for Tree Creation [done]
+### Dependencies: 2.1
+### Description: Create Cross-Program Invocation (CPI) functionality to interact with Light Protocol for creating and initializing a new Merkle tree for each campaign.
+### Details:
+Implement a module for Light Protocol interactions that includes: 1) Functions to build CPI instructions for tree creation, 2) Helper methods to serialize campaign data into the format expected by Light Protocol, 3) Logic to sign and send the CPI transaction to Light Protocol's program, and 4) Error handling for CPI responses. Use the Light Protocol SDK or directly construct the CPI based on their program interface. This should be called during campaign creation after the campaign state is initialized with the new Merkle root field.
+
+## 3. Implement Merkle Tree Updates and Proof Verification [done]
+### Dependencies: 2.1, 2.2
+### Description: Add functionality to update the Merkle tree when campaign data changes and verify zero-knowledge proofs submitted by users.
+### Details:
+Create instruction handlers for: 1) Updating the Merkle tree via CPI to Light Protocol when campaign data changes, ensuring the Merkle root in the campaign state is updated accordingly, 2) Verifying ZK proofs submitted by users against the stored Merkle root, 3) Implementing the logic to process valid proofs and reject invalid ones. This should include proper error handling and event emission for successful verification. Test thoroughly with both valid and invalid proof scenarios to ensure the verification logic works correctly.
+
+## 4. Implement initialize_campaign CPI [done]
+### Dependencies: None
+### Description: Implement the CPI call to Light Protocol's account_compression program to create the Merkle tree.
+### Details:
+
+

@@ -1,16 +1,45 @@
-# Logs
-logs
+# Node.js / TypeScript
+node_modules/
+dist/
+build/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-dev-debug.log
-
-# Dependency directories
-node_modules/
-
-# Environment variables
+coverage/
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Rust / Cargo / Solana
+target/
+Cargo.lock
+**/*.rs.bk
+*.so
+*.a
+*.dylib
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# Light Protocol builds
+ZK-STACK/tests/*
+!ZK-STACK/tests/*.rs
+!ZK-STACK/tests/README.md
+
+# Misc
+.DS_Store
+*.pem
+thumbs.db
+.idea/
+
+# Keep
+!.gitignore
+!.prettierignore
+!.cargo/config.toml
 
 # Editor directories and files
 .idea
