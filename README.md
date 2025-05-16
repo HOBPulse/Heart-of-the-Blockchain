@@ -245,14 +245,14 @@ Additional documentation can be found in the [docs directory](./docs).
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/heart-of-blockchain.git
+git clone https://github.com/HOBPulse/Heart-of-the-Blockchain.git
 cd heart-of-blockchain
 
 # Install dependencies
 npm install
 
 # Build the Solana program
-cd program
+cd programs
 cargo build-bpf
 
 # Run tests

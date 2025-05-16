@@ -13,13 +13,17 @@
     "@coral-xyz/anchor": "^0.31.0",
     "@lightprotocol/stateless.js": "file:../external/light-protocol/js/stateless.js",
     "@solana/web3.js": "^1.87.0",
-    "bn.js": "^5.2.1"
+    "bn.js": "^5.2.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.5",
     "@types/chai": "^4.3.6",
     "@types/mocha": "^10.0.6",
     "@types/node": "^20.10.5",
+    "@types/react": "^19.1.4",
+    "@types/react-dom": "^19.1.5",
     "@types/sinon": "^17.0.4",
     "chai": "^4.3.10",
     "mocha": "^10.2.0",
