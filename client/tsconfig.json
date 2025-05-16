@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "strict": true,
@@ -12,8 +12,19 @@
     "baseUrl": ".",
     "paths": {
       "*": ["node_modules/*"]
-    }
+    },
+    "skipLibCheck": true
   },
-  "include": ["src/**/*", "test/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*",
+    "test/**/*",
+    "src/chai-shim.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "node_modules/@types/sinon",
+    "**/node_modules/@types/sinon",
+    "**/.pnpm/@types+sinon*/node_modules/@types/sinon"
+  ]
 } 

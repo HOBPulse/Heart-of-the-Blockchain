@@ -1,5 +1,5 @@
 [toolchain]
-
+anchor_version = "0.31.0"
 [features]
 seeds = false
 skip-lint = false
@@ -16,3 +16,4 @@ wallet = "/home/zyrav23reborned/.config/solana/id.json"
 
 [scripts]
 test = "yarn run mocha -t 1000000 tests/"
+build = "anchor build"

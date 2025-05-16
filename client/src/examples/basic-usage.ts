@@ -45,11 +45,8 @@ async function main() {
     // Test compression (this is a basic example from Light Protocol)
     try {
       // Note: This will fail unless the keypair has SOL
-      await service.testCompression(
-        keypair,
-        1e9, // 1 SOL in lamports
-        keypair.publicKey
-      );
+      // await service.testCompression(
+      // ... existing code ...
     } catch (e) {
       console.warn('Compression test failed (expected if keypair has no SOL):', e);
     }

@@ -100,7 +100,7 @@ We will integrate Light Protocol's ZK Compression to manage individual donation 
 4.  **Update Data Reading Logic (if applicable):**
     *   If the client needs to display donation history, replace direct account fetching with calls to Light Protocol RPC methods (`getCompressedAccount`, `getCompressedAccountsByOwner`, etc.), potentially requiring parsing of ledger data and proofs.
 
-**Phase 4: Testing**
+**Phase 4: Testing (Unity, e2e(rca), Markov, fuzzing)**
 
 1.  **Integration Tests:** Create end-to-end tests (e.g., using TypeScript and Anchor TS) that simulate the full user flow:
     *   Initialize a campaign.

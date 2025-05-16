@@ -1,0 +1,266 @@
+{
+  "address": "compr6CUsB5m2jS4Y3831ztGSTnDpnKJTKS95d64XVq",
+  "metadata": {
+    "name": "zk_donations",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "donate_compressed_amount",
+      "discriminator": [
+        199,
+        206,
+        241,
+        72,
+        91,
+        121,
+        63,
+        79
+      ],
+      "accounts": [
+        {
+          "name": "user_donator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "campaign",
+          "writable": true
+        },
+        {
+          "name": "merkle_tree",
+          "docs": [
+            "Authority should be the campaign PDA."
+          ],
+          "writable": true,
+          "relations": [
+            "campaign"
+          ]
+        },
+        {
+          "name": "output_queue",
+          "writable": true
+        },
+        {
+          "name": "light_account_compression_program",
+          "address": "compr6CUsB5m2jS4Y3831ztGSTnDpnKJTKS95d64XVq"
+        }
+      ],
+      "args": [
+        {
+          "name": "_campaign_id",
+          "type": "u64"
+        },
+        {
+          "name": "_leaf_data",
+          "type": "bytes"
+        },
+        {
+          "name": "proof_data",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "initialize_campaign",
+      "docs": [
+        "Initializes a new donation campaign and its associated compressed donation state tree.",
+        "",
+        "Arguments:",
+        "- `ctx`: Context struct containing required accounts.",
+        "- `campaign_id`: A unique identifier for the campaign within the user's scope.",
+        "- `title`: The title of the campaign.",
+        "- `description`: A description of the campaign.",
+        "- `params_bytes`: Serialized InitStateTreeAccountsInstructionData.",
+        "",
+        "Accounts:",
+        "- `user`: The signer initializing the campaign.",
+        "- `campaign`: The campaign account (PDA) to be initialized.",
+        "- `merkle_tree`: The account for the Merkle tree, created via CPI to Light Protocol.",
+        "- `output_queue`: The account for the output queue, created via CPI to Light Protocol.",
+        "- `light_account_compression_program`: The Light Protocol account compression program.",
+        "- `system_program`: Required for creating the campaign PDA."
+      ],
+      "discriminator": [
+        169,
+        88,
+        7,
+        6,
+        9,
+        165,
+        65,
+        132
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "docs": [
+            "The user initializing the campaign (signer)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "campaign",
+          "docs": [
+            "The campaign account (PDA) to be created and act as tree authority."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  109,
+                  112,
+                  97,
+                  105,
+                  103,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              },
+              {
+                "kind": "arg",
+                "path": "campaign_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merkle_tree",
+          "docs": [
+            "Assumed to be created and rent-paid by the client before this instruction."
+          ],
+          "writable": true
+        },
+        {
+          "name": "output_queue",
+          "docs": [
+            "Assumed to be created and rent-paid by the client before this instruction."
+          ],
+          "writable": true
+        },
+        {
+          "name": "light_account_compression_program",
+          "docs": [
+            "The Light Protocol account compression program."
+          ],
+          "address": "compr6CUsB5m2jS4Y3831ztGSTnDpnKJTKS95d64XVq"
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "Solana System Program."
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "campaign_id",
+          "type": "u64"
+        },
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "params_bytes",
+          "type": "bytes"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Campaign",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "user", "docs": ["The user who initialized the campaign."], "type": "pubkey" },
+          { "name": "campaign_id", "docs": ["Unique identifier for the campaign (within user scope)."], "type": "u64" },
+          { "name": "title", "docs": ["Title of the campaign."], "type": "string" },
+          { "name": "description", "docs": ["Description of the campaign."], "type": "string" },
+          { "name": "merkle_tree", "docs": ["Public key of the associated Merkle tree account (managed by Light Protocol)."], "type": "pubkey" },
+          { "name": "output_queue", "docs": ["Public key of the associated output queue account (managed by Light Protocol)."], "type": "pubkey" },
+          { "name": "bump", "docs": ["PDA bump seed."], "type": "u8" }
+        ]
+      },
+      "discriminator": [50, 40, 49, 11, 157, 220, 229, 192]
+    }
+  ],
+  "types": [
+    {
+      "name": "Campaign",
+      "docs": [
+        "State account for a donation campaign."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "docs": [
+              "The user who initialized the campaign."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "campaign_id",
+            "docs": [
+              "Unique identifier for the campaign (within user scope)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "title",
+            "docs": [
+              "Title of the campaign."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "docs": [
+              "Description of the campaign."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "merkle_tree",
+            "docs": [
+              "Public key of the associated Merkle tree account (managed by Light Protocol)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "output_queue",
+            "docs": [
+              "Public key of the associated output queue account (managed by Light Protocol)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

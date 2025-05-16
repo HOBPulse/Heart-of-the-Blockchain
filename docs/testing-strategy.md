@@ -4,11 +4,39 @@
 
 All tests referenced in this strategy are implemented in the following directories. Each directory contains a README with details on the context and purpose of its tests:
 
-- [client/test/services/](../client/test/services/) — Unit tests for client SDK services ([README](../client/test/services/README.md))
+- [client/test/services/](../client/test/services/) — Unit and integration tests for client SDK services ([README](../client/test/services/README.md))
 - [tests/](../tests/) — Integration and end-to-end tests ([README](../tests/README.md))
 - [ZK-STACK/tests/](../ZK-STACK/tests/) — Rust-based ZK/Merkle/proof logic tests ([README](../ZK-STACK/tests/README.md))
 
-This document outlines the comprehensive testing approach for the Heart of Blockchain project, with particular focus on the client SDK components that have been implemented. The testing strategy follows industry best practices and ensures robust, reliable code with high test coverage.
+> **Test Runner:**
+> - Running `pnpm test` from the `client/` directory will execute all test files in `client/test/services/` using Vitest.
+> - These tests are also executed as part of the CI pipeline to ensure code quality and correctness.
+
+## Test File Mapping
+
+Below is a mapping of each test file to the service or feature it covers. All these files are run by `pnpm test`:
+
+### client/test/services/
+- **TransactionService.test.ts** — Unit and integration tests for TransactionService, including wallet integration, Anchor/IDL usage, PDA derivation, Merkle proof integration, transaction status tracking, and error handling.
+- **LightProtocolService.test.ts** — Tests for LightProtocolService, covering initialization, connection, IDL loading, error handling, and utility methods.
+- **MerkleProofService.test.ts** — Tests for MerkleProofService, including Merkle state fetching, proof generation, caching, error handling, and concurrency.
+
+*(Add any additional test files here as they are created)*
+
+### tests/
+- **transaction_service_integration.js** — Integration tests for TransactionService and Solana program.
+- **merkle_proof_integration.js** — Integration tests for Merkle proof logic.
+- **client_sdk_integration.js** — End-to-end tests for the client SDK.
+- **heart_of_blockchain.ts** — High-level integration and flow tests.
+
+### ZK-STACK/tests/
+- **test_merkle_root_update.rs** — Rust test for Merkle root update logic.
+- **test_leaf_formatting.rs** — Rust test for leaf formatting.
+- **test_zk_verification.rs** — Rust test for ZK proof verification.
+- **test_initialize_campaign.rs** — Rust test for InitializeCampaign instruction.
+- **test_donate_compressed.rs** — Rust test for Donate instruction.
+- **test_withdraw.rs** — Rust test for Withdraw instruction.
+- **test_task2.rs** — Rust test for Task 2 subtasks and overall program logic.
 
 ## Testing Philosophy
 
@@ -72,11 +100,18 @@ Tests for the service that builds and sends transactions with proofs:
 ## ZK-STACK and Merkle/Proof Logic Tests
 
 - **Location:** [ZK-STACK/tests/](../ZK-STACK/tests/) ([README](../ZK-STACK/tests/README.md))
-- **Purpose:** Test Merkle root updates, leaf formatting, and ZK proof verification logic in Rust.
+- **Purpose:** Test Merkle root updates, leaf formatting, ZK proof verification logic, and Solana program instruction flows in Rust.
 - **Files:**
   - `test_merkle_root_update.rs`
   - `test_leaf_formatting.rs`
   - `test_zk_verification.rs`
+  - `test_initialize_campaign.rs` *(Validates InitializeCampaign instruction, see Task 3)*
+  - `test_donate_compressed.rs` *(Validates Donate instruction, see Task 3)*
+  - `test_withdraw.rs` *(Validates Withdraw instruction, see Task 3)*
+  - `test_task2.rs` *(Verifies all Task 2 subtasks: account structure, Merkle tree, Light Protocol CPI, proof verification, and campaign initialization. Provides a high-level check for Task 2 completion.)*
+
+> **Note:**
+> The above Rust integration tests directly correspond to the implementation and validation of the core Solana program instructions and account structures described in [Task 2](../../tasks/tasks.json) and [Task 3](../../tasks/tasks.json). See [ZK-STACK/tests/README.md](../ZK-STACK/tests/README.md) for further context and usage details.
 
 ## Mocking Strategy
 

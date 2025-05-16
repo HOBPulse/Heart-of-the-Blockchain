@@ -224,3 +224,6 @@ impl Campaign {
         + 32 // output_queue pubkey
         + 1; // bump u8
 }
+
+// Re-export the program module for integration tests
+pub use crate as heart_of_blockchain;

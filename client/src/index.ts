@@ -7,6 +7,8 @@ export * from './services/TransactionService';
 import { LightProtocolService } from './services/LightProtocolService';
 import { MerkleProofService, MerkleProofOptions } from './services/MerkleProofService';
 import { TransactionService, TransactionOptions } from './services/TransactionService';
+import { Connection } from '@solana/web3.js';
+import { Wallet } from '@coral-xyz/anchor';
 
 /**
  * Initialize the Light Protocol SDK and return a service instance
@@ -29,15 +31,19 @@ export function initMerkleProofService(lightService: LightProtocolService, optio
 
 /**
  * Initialize the Transaction service with required services
+ * @param connection Solana Connection instance
+ * @param wallet Wallet instance
  * @param lightService LightProtocolService instance
  * @param merkleService Optional MerkleProofService instance (will be created if not provided)
  * @returns An initialized TransactionService
  */
 export function initTransactionService(
+  connection: Connection,
+  wallet: Wallet,
   lightService: LightProtocolService,
   merkleService?: MerkleProofService
 ) {
-  return new TransactionService(lightService, merkleService);
+  return new TransactionService(connection, wallet, lightService, merkleService);
 }
 
 // Export default

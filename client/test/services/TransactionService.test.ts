@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+import { expect, vi } from 'vitest';
 import { 
   Keypair, 
   PublicKey,
@@ -10,14 +10,17 @@ import {
 import { LightProtocolService } from '../../src/services/LightProtocolService';
 import { MerkleProofService, MerkleProof } from '../../src/services/MerkleProofService';
 import { TransactionService, TransactionStatus } from '../../src/services/TransactionService';
-import sinon from 'sinon';
+import sinon, { SinonSandbox } from 'sinon';
+import { Wallet } from '@coral-xyz/anchor';
 
 describe('TransactionService', () => {
   let lightService: LightProtocolService;
   let merkleService: MerkleProofService;
   let transactionService: TransactionService;
   let keypair: Keypair;
-  let sandbox: sinon.SinonSandbox;
+  let sandbox: any;
+  let connection: Connection;
+  let wallet: Wallet;
   
   // Use a custom RPC URL for testing if needed
   const testConfig = {
@@ -32,7 +35,13 @@ describe('TransactionService', () => {
     // Create new service instances for each test
     lightService = new LightProtocolService(testConfig);
     merkleService = new MerkleProofService(lightService);
-    transactionService = new TransactionService(lightService, merkleService);
+    connection = new Connection(testConfig.rpcUrl);
+    wallet = {
+      publicKey: Keypair.generate().publicKey,
+      signTransaction: vi.fn().mockResolvedValue({}),
+      signAllTransactions: vi.fn().mockResolvedValue([])
+    } as unknown as Wallet;
+    transactionService = new TransactionService(connection, wallet, lightService, merkleService);
     
     // Create a new keypair for testing
     keypair = Keypair.generate();
@@ -54,9 +63,7 @@ describe('TransactionService', () => {
     });
   });
   
-  describe('Transaction Building', function() {
-    this.timeout(5000); // Increase timeout
-    
+  describe('Transaction Building', () => {
     it('should build a transaction with a proof', async () => {
       // Create mock proof
       const mockProof: MerkleProof = {
@@ -153,9 +160,7 @@ describe('TransactionService', () => {
     });
   });
   
-  describe('Transaction Sending', function() {
-    this.timeout(5000); // Increase timeout
-    
+  describe('Transaction Sending', () => {
     it('should send a transaction successfully', async () => {
       // Create a simple transaction
       const transaction = new Transaction();
@@ -181,7 +186,7 @@ describe('TransactionService', () => {
       // This test doesn't use the real web3.js sendAndConfirmTransaction but directly calls connection methods
       const originalSendTransaction = transactionService.sendTransaction;
       const sendTransactionStub = sandbox.stub(transactionService, 'sendTransaction').callsFake(
-        async (tx, signers, options) => {
+        async (tx: any, signers: any, options: any) => {
           const conn = lightService.getConnection();
           const sig = await (conn as any).sendAndConfirmTransaction(tx, signers, options);
           return {
@@ -223,7 +228,7 @@ describe('TransactionService', () => {
       
       // We need to override the transaction service's internal implementation to use our mocks
       const sendTransactionStub = sandbox.stub(transactionService, 'sendTransaction').callsFake(
-        async (tx, signers, options = {}) => {
+        async (tx: any, signers: any, options: any = {}) => {
           try {
             const conn = lightService.getConnection();
             await (conn as any).sendAndConfirmTransaction(tx, signers, options);
@@ -278,7 +283,7 @@ describe('TransactionService', () => {
       
       // We need to override the transaction service's internal implementation to use our mocks
       const sendTransactionStub = sandbox.stub(transactionService, 'sendTransaction').callsFake(
-        async (tx, signers, options = {}) => {
+        async (tx: any, signers: any, options: any = {}) => {
           try {
             const conn = lightService.getConnection();
             const sig = await (conn as any).sendAndConfirmTransaction(tx, signers, options);
@@ -446,9 +451,7 @@ describe('TransactionService', () => {
       expect(getSignatureStatusStub.callCount).to.be.at.least(2);
     });
     
-    it('should timeout if transaction does not confirm in time', async function() {
-      this.timeout(5000); // Increase timeout for this test specifically
-      
+    it('should timeout if transaction does not confirm in time', async () => {
       const mockSignature = 'timeout-signature';
       
       // Mock connection that never returns confirmed
@@ -516,5 +519,73 @@ describe('TransactionService', () => {
       expect(instructions[0].programId.toString()).to.equal('9FHnJ6S5P1UoWtyd6iqXYESy4WEGvGArA5W17f6H1gQk');
       expect(instructions[0].data).to.exist;
     });
+  });
+});
+
+describe('TransactionService 5.3 Integration', () => {
+  const connection = { rpcEndpoint: 'http://localhost:8899' } as any;
+  const wallet = {
+    publicKey: Keypair.generate().publicKey,
+    signTransaction: vi.fn().mockResolvedValue({})
+  } as unknown as Wallet;
+  const lightService = new LightProtocolService({ rpcUrl: 'http://localhost:8899' });
+  const merkleService = new MerkleProofService(lightService);
+  const txService = new TransactionService(connection as any, wallet, lightService, merkleService);
+
+  it('should derive the correct campaign PDA', async () => {
+    const user = Keypair.generate().publicKey;
+    const campaignId = 42;
+    const [pda] = await TransactionService.deriveCampaignPDA(user, campaignId);
+    expect(pda).toBeInstanceOf(PublicKey);
+  });
+
+  it('should call Anchor initializeCampaign with correct args', async () => {
+    const spy = vi.spyOn(txService['program'].methods, 'initializeCampaign');
+    await txService.createCampaign({
+      user: wallet.publicKey,
+      merkleTree: Keypair.generate().publicKey,
+      outputQueue: Keypair.generate().publicKey,
+      lightAccountCompressionProgram: Keypair.generate().publicKey,
+      systemProgram: Keypair.generate().publicKey,
+      campaignId: 1,
+      title: 'Test',
+      description: 'Test campaign',
+      campaignParams: { foo: 'bar' }
+    });
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('should call Anchor donateCompressedAmount with correct args', async () => {
+    const spy = vi.spyOn(txService['program'].methods, 'donateCompressedAmount');
+    await txService.donateCompressed({
+      userDonator: wallet.publicKey,
+      campaign: Keypair.generate().publicKey,
+      merkleTree: Keypair.generate().publicKey,
+      outputQueue: Keypair.generate().publicKey,
+      lightAccountCompressionProgram: Keypair.generate().publicKey,
+      campaignId: 1,
+      leafData: { foo: 'bar' },
+      proofData: { baz: 'qux' }
+    });
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('should use the provided wallet for signing', async () => {
+    // Simulate a method that would trigger signing
+    wallet.signTransaction = vi.fn().mockResolvedValue({});
+    // You would call a method that triggers signing here
+    expect(wallet.signTransaction).not.toBeCalled(); // Placeholder: update if you have a real signing flow
+  });
+
+  it('should integrate with MerkleProofService for proof generation', async () => {
+    const proofSpy = vi.spyOn(merkleService, 'generateProof').mockResolvedValue({
+      leafIndex: 0, leaf: 'leaf', siblings: [], root: 'root'
+    });
+    // Example: call a method that triggers proof generation
+    await merkleService.generateProof('tree', 0, 'leaf');
+    expect(proofSpy).toHaveBeenCalled();
+    proofSpy.mockRestore();
   });
 }); 

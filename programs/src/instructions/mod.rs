@@ -12,3 +12,6 @@ pub use donate::*;
 
 pub mod donate_compressed;
 pub use donate_compressed::*;
+
+pub mod withdraw;
+pub use withdraw::*;

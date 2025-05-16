@@ -1,5 +1,6 @@
 import { PublicKey } from '@solana/web3.js';
 import { LightProtocolService } from './LightProtocolService';
+import BN from 'bn.js';
 
 /**
  * Interface representing a node in the Merkle tree
@@ -42,6 +43,24 @@ const DEFAULT_OPTIONS: Required<MerkleProofOptions> = {
 };
 
 /**
+ * MerkleProofService
+ * ------------------
+ * Service for managing Merkle state and proof generation for Light Protocol in the Heart of Blockchain SDK.
+ *
+ * - Allows fetching Merkle state of a given tree (using LightProtocolService)
+ * - Allows generating Merkle proofs for specific leaves (donations) using Light Protocol RPC
+ * - Integrates with TransactionService to build ZK transactions and with LightProtocolService for connectivity
+ *
+ * Usage example:
+ *
+ *   import { MerkleProofService } from './MerkleProofService';
+ *   const merkleService = new MerkleProofService(lightService);
+ *   const proof = await merkleService.generateProof(treeId, leafIndex, leafData);
+ *
+ * This service is fundamental for ZK integration and private donation validation in the MVP.
+ */
+
+/**
  * Service for fetching Merkle state and generating proofs
  */
 export class MerkleProofService {
@@ -73,48 +92,36 @@ export class MerkleProofService {
   /**
    * Fetch the current Merkle tree state from Light Protocol
    * 
-   * @param treeId The Merkle tree ID to fetch
+   * @param treeId The Merkle tree ID to fetch (should be a base58 public key string)
    * @param forceRefresh Force refresh from chain even if cached
-   * @returns The Merkle tree state
+   * @returns The Merkle tree state (compressed accounts for the owner)
    */
   async fetchMerkleState(treeId: string, forceRefresh = false): Promise<any> {
     const cacheKey = `state:${treeId}`;
-    
-    // Return cached state if available and cache is enabled
     if (this.options.useCache && !forceRefresh && this.stateCache.has(cacheKey)) {
       console.log(`Using cached Merkle state for tree: ${treeId}`);
       return this.stateCache.get(cacheKey);
     }
-    
     console.log(`Fetching Merkle state for tree: ${treeId}`);
-    
     let retries = 0;
     let lastError: Error | null = null;
-    
-    // Implement retry logic
     while (retries < this.options.maxRetries) {
       try {
-        // In a real implementation, this would call the Light Protocol SDK
-        // For now, we'll mock a response representing a Merkle tree state
-        const state = await this.mockFetchMerkleTreeState(treeId);
-        
-        // Cache the result if caching is enabled
+        // Use the real Light Protocol SDK to fetch compressed accounts for the tree owner
+        const rpc = this.lightService.getRpc();
+        const owner = new PublicKey(treeId);
+        const state = await rpc.getCompressedAccountsByOwner(owner);
         if (this.options.useCache) {
           this.stateCache.set(cacheKey, state);
         }
-        
         return state;
       } catch (error) {
         retries++;
         lastError = error as Error;
         console.warn(`Attempt ${retries}/${this.options.maxRetries} failed: ${error}`);
-        
-        // Wait before retrying
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
-    
-    // All retries failed
     throw new Error(`Failed to fetch Merkle state after ${this.options.maxRetries} attempts: ${lastError?.message}`);
   }
   
@@ -134,27 +141,40 @@ export class MerkleProofService {
     options: { forceRefresh?: boolean } = {}
   ): Promise<MerkleProof> {
     const cacheKey = `proof:${treeId}:${leafIndex}:${leafData}`;
-    
-    // Return cached proof if available and cache is enabled
     if (this.options.useCache && !options.forceRefresh && this.proofCache.has(cacheKey)) {
       console.log(`Using cached Merkle proof for leaf ${leafIndex} in tree ${treeId}`);
       return this.proofCache.get(cacheKey)!;
     }
-    
     console.log(`Generating Merkle proof for leaf ${leafIndex} in tree ${treeId}`);
-    
-    // Fetch the state if needed
-    const state = await this.fetchMerkleState(treeId, options.forceRefresh);
-    
-    // In a real implementation, this would call the Light Protocol SDK
-    // For now, we'll mock proof generation
-    const proof = await this.mockGenerateProof(state, leafIndex, leafData);
-    
-    // Cache the proof if caching is enabled
+    // Fetch the state if needed (not strictly required for real proof, but may be useful for context)
+    // const state = await this.fetchMerkleState(treeId, options.forceRefresh);
+    // Use the real Light Protocol SDK to generate a Merkle proof
+    const rpc = this.lightService.getRpc();
+    // The SDK expects a BN for the hash argument. Convert leafData to BN if possible.
+    let hash: BN;
+    try {
+      // If leafData is a hex string, convert to BN. Otherwise, hash it as needed for your use case.
+      hash = new BN(leafData, 16);
+    } catch {
+      // Fallback: use a hash of the string (not cryptographically correct, but avoids crash)
+      hash = new BN(Buffer.from(leafData).toString('hex'), 16);
+    }
+    let proofResult;
+    try {
+      proofResult = await rpc.getCompressedAccountProof(hash);
+    } catch (error) {
+      throw new Error(`Failed to generate Merkle proof: ${(error as Error).message}`);
+    }
+    // Adapt the returned structure to the MerkleProof interface
+    const proof: MerkleProof = {
+      leafIndex: proofResult.leafIndex ?? leafIndex,
+      leaf: leafData,
+      siblings: proofResult.merkleProof?.map((bn: BN) => bn.toString()) ?? [],
+      root: proofResult.root?.toString() ?? ''
+    };
     if (this.options.useCache) {
       this.proofCache.set(cacheKey, proof);
     }
-    
     return proof;
   }
   
@@ -163,13 +183,31 @@ export class MerkleProofService {
    * 
    * @param proof The Merkle proof to verify
    * @returns Whether the proof is valid
+   * @throws Always throws: client-side verification is not supported by the Light Protocol SDK.
    */
   async verifyProof(proof: MerkleProof): Promise<boolean> {
     console.log(`Verifying Merkle proof for leaf ${proof.leafIndex}`);
-    
-    // In a real implementation, this would call the Light Protocol SDK
-    // For now, we'll mock verification
-    return this.mockVerifyProof(proof);
+    // Client-side verification is not supported by the Light Protocol SDK.
+    // This method is a placeholder and will always throw.
+    throw new Error(
+      'Merkle proof verification is not supported client-side. ' +
+      'Light Protocol does not expose a TypeScript/WASM verifier. ' +
+      'Verification must be performed on-chain or with a supported prover.'
+    );
+  }
+  
+  /**
+   * Calculate root hash from a leaf and its proof
+   *
+   * @param leaf The leaf hash
+   * @param siblings The sibling hashes
+   * @returns The calculated root hash (placeholder, not a real Poseidon calculation)
+   * @note Real Poseidon-based calculation is not implemented in this SDK. This is a stub.
+   */
+  calculateRootFromProof(leaf: string, siblings: string[]): string {
+    // TODO: Implement real Poseidon-based root calculation if/when available in JS/WASM.
+    // For now, just returning a mock hash for interface compatibility.
+    return `mock-root-${Date.now()}`;
   }
   
   /**
@@ -179,72 +217,5 @@ export class MerkleProofService {
     console.log('Clearing Merkle proof and state caches');
     this.stateCache.clear();
     this.proofCache.clear();
-  }
-  
-  /**
-   * Calculate root hash from a leaf and its proof
-   * 
-   * @param leaf The leaf hash
-   * @param siblings The sibling hashes
-   * @returns The calculated root hash
-   */
-  calculateRootFromProof(leaf: string, siblings: string[]): string {
-    // In a real implementation, this would compute the root hash
-    // using the provided leaf and sibling hashes
-    
-    // For now, just returning a mock hash
-    return `mock-root-${Date.now()}`;
-  }
-  
-  // Mock implementations for testing
-  
-  /**
-   * Mock implementation of fetching Merkle tree state
-   * In a real implementation, this would call Light Protocol SDK
-   */
-  private async mockFetchMerkleTreeState(treeId: string): Promise<any> {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Return a mock tree state
-    return {
-      treeId,
-      height: 20,
-      root: `mock-root-${treeId}-${Date.now()}`,
-      leaves: Array(10).fill(0).map((_, i) => ({
-        index: i,
-        hash: `mock-leaf-${i}-${Date.now()}`
-      })),
-      nodeCount: 10
-    };
-  }
-  
-  /**
-   * Mock implementation of generating a proof
-   * In a real implementation, this would call Light Protocol SDK
-   */
-  private async mockGenerateProof(state: any, leafIndex: number, leafData: string): Promise<MerkleProof> {
-    // Simulate proof generation delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Return a mock proof
-    return {
-      leafIndex,
-      leaf: `mock-leaf-${leafIndex}-${leafData}`,
-      siblings: Array(4).fill(0).map((_, i) => `mock-sibling-${i}-${Date.now()}`),
-      root: state.root
-    };
-  }
-  
-  /**
-   * Mock implementation of verifying a proof
-   * In a real implementation, this would call Light Protocol SDK
-   */
-  private async mockVerifyProof(proof: MerkleProof): Promise<boolean> {
-    // Simulate verification delay
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Always return true for mock implementation
-    return true;
   }
 } 

@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "@lightprotocol/stateless.js": "^0.21.0",
+    "buffer-layout": "^1.2.2"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.6",
+    "@types/estree": "^1.0.7",
+    "@types/sinon": "^17.0.4",
+    "@types/sinonjs__fake-timers": "^8.1.5",
+    "vitest": "^3.1.3"
+  }
+}

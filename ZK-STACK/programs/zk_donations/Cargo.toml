@@ -1,12 +1,12 @@
 [package]
-name = "zk_donations"
+name = "heart_of_blockchain"
 version = "0.1.0"
-description = "Created with Anchor"
 edition = "2021"
+
+description = "Created with Anchor"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "zk_donations"
 
 [features]
 default = []
@@ -15,8 +15,8 @@ no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 sbf-out-dir = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
 anchor-lang = "0.31.0"
-# Add Light Protocol Account Compression crate dependency
-account-compression = { path = "../../../external/light-protocol/programs/account-compression", features = ["cpi"] }
+account-compression = { path = "../../../external/light-protocol/programs/account-compression", features = ["cpi"] } 

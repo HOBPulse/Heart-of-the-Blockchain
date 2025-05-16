@@ -12,6 +12,16 @@ import {
 } from '@solana/web3.js';
 import { LightProtocolService } from './LightProtocolService';
 import { MerkleProofService, MerkleProof } from './MerkleProofService';
+import BN from 'bn.js';
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress
+} from '@solana/spl-token';
+// @ts-ignore: Anchor types may not be present in node_modules
+import { Program, AnchorProvider, Idl, Wallet } from '@coral-xyz/anchor';
+// @ts-ignore: JSON import for Anchor IDL
+import idl from '../../idl/zk_donations.json';
 
 /**
  * Status of a transaction
@@ -50,28 +60,81 @@ export interface TransactionResult {
   confirmationDetails?: any;
 }
 
+const PROGRAM_ID = new PublicKey('compr6CUsB5m2jS4Y3831ztGSTnDpnKJTKS95d64XVq');
+const CAMPAIGN_SEED = Buffer.from('campaign');
+
 /**
  * Service for building and sending transactions with proofs
  */
 export class TransactionService {
-  private lightService: LightProtocolService;
-  private merkleService: MerkleProofService;
+  private program: Program;
+  private lightService: any;
+  private merkleService: any;
   private pendingTransactions: Map<string, TransactionStatus> = new Map();
   
   /**
    * Create a new TransactionService
    * 
-   * @param lightService The LightProtocolService instance
+   * @param connection The Solana connection
+   * @param wallet The wallet for signing transactions
+   * @param lightService The LightProtocolService instance (optional, will create if not provided)
    * @param merkleService The MerkleProofService instance (optional, will create if not provided)
    */
   constructor(
-    lightService: LightProtocolService,
-    merkleService?: MerkleProofService
+    connection: Connection,
+    wallet: Wallet,
+    lightService?: any,
+    merkleService?: any
   ) {
     this.lightService = lightService;
-    this.merkleService = merkleService || new MerkleProofService(lightService);
+    this.merkleService = merkleService;
+    // Ensure wallet implements the required interface for AnchorProvider
+    const provider = new AnchorProvider(connection, wallet as any, {});
+    this.program = new Program(idl as Idl, PROGRAM_ID, provider);
     
     console.log('TransactionService initialized');
+  }
+  
+  /**
+   * Deriva la PDA de campaign según el IDL (seeds: ['campaign', user, campaign_id])
+   */
+  static async deriveCampaignPDA(user: PublicKey, campaignId: number): Promise<[PublicKey, number]> {
+    // Serializa campaignId como Buffer de 8 bytes little-endian
+    const campaignIdBuf = Buffer.alloc(8);
+    new BN(campaignId).toArray('le', 8).forEach((b, i) => campaignIdBuf[i] = b);
+    return await PublicKey.findProgramAddress(
+      [
+        CAMPAIGN_SEED,
+        user.toBuffer(),
+        campaignIdBuf
+      ],
+      PROGRAM_ID
+    );
+  }
+  
+  /**
+   * Serializa los parámetros de la campaña para paramsBytes (placeholder, adapta según tu layout real)
+   */
+  static serializeCampaignParams(params: Record<string, any>): Buffer {
+    // TODO: Serializa según el layout real esperado por el programa (ejemplo: Borsh, Buffer, etc)
+    // Aquí solo serializa como JSON para ejemplo
+    return Buffer.from(JSON.stringify(params));
+  }
+  
+  /**
+   * Serializa leafData (placeholder, adapta según tu layout real)
+   */
+  static serializeLeafData(data: Record<string, any>): Buffer {
+    // TODO: Serializa según el layout real esperado por el programa
+    return Buffer.from(JSON.stringify(data));
+  }
+  
+  /**
+   * Serializa proofData (placeholder, adapta según tu layout real)
+   */
+  static serializeProofData(data: Record<string, any>): Buffer {
+    // TODO: Serializa según el layout real esperado por el programa
+    return Buffer.from(JSON.stringify(data));
   }
   
   /**
@@ -326,5 +389,112 @@ export class TransactionService {
         ])
       })
     ];
+  }
+
+  /**
+   * Inicializa una campaña usando Anchor y el IDL
+   * Deriva la PDA automáticamente y serializa paramsBytes
+   */
+  async createCampaign(params: {
+    user: PublicKey,
+    merkleTree: PublicKey,
+    outputQueue: PublicKey,
+    lightAccountCompressionProgram: PublicKey,
+    systemProgram: PublicKey,
+    campaignId: number,
+    title: string,
+    description: string,
+    campaignParams: Record<string, any>
+  }): Promise<string> {
+    const [campaignPDA] = await TransactionService.deriveCampaignPDA(params.user, params.campaignId);
+    const paramsBytes = TransactionService.serializeCampaignParams(params.campaignParams);
+    return await this.program.methods
+      .initializeCampaign(
+        new BN(params.campaignId),
+        params.title,
+        params.description,
+        Array.from(paramsBytes)
+      )
+      .accounts({
+        user: params.user,
+        campaign: campaignPDA,
+        merkleTree: params.merkleTree,
+        outputQueue: params.outputQueue,
+        lightAccountCompressionProgram: params.lightAccountCompressionProgram,
+        systemProgram: params.systemProgram
+      })
+      .rpc();
+  }
+
+  /**
+   * Donación comprimida con ZK proof usando Anchor
+   * Serializa leafData y proofData automáticamente
+   */
+  async donateCompressed(params: {
+    userDonator: PublicKey,
+    campaign: PublicKey,
+    merkleTree: PublicKey,
+    outputQueue: PublicKey,
+    lightAccountCompressionProgram: PublicKey,
+    campaignId: number,
+    leafData: Record<string, any>,
+    proofData: Record<string, any>
+  }): Promise<string> {
+    const leafDataBuf = TransactionService.serializeLeafData(params.leafData);
+    const proofDataBuf = TransactionService.serializeProofData(params.proofData);
+    return await this.program.methods
+      .donateCompressedAmount(
+        new BN(params.campaignId),
+        Array.from(leafDataBuf),
+        Array.from(proofDataBuf)
+      )
+      .accounts({
+        userDonator: params.userDonator,
+        campaign: params.campaign,
+        merkleTree: params.merkleTree,
+        outputQueue: params.outputQueue,
+        lightAccountCompressionProgram: params.lightAccountCompressionProgram
+      })
+      .rpc();
+  }
+
+  /**
+   * Retiro de fondos de campaña
+   * @param params Parámetros del retiro
+   * @returns Transacción lista para firmar
+   */
+  async withdraw(params: {
+    creator: PublicKey,
+    mint: PublicKey,
+    campaignId: number,
+    title: string,
+    withdrawAmount: number,
+    campaignAccountInfo: PublicKey,
+    creatorTokenAccount: PublicKey,
+    campaignTokenAccount: PublicKey,
+    tokenProgram: PublicKey,
+    systemProgram: PublicKey,
+    associatedTokenProgram: PublicKey,
+  }): Promise<Transaction> {
+    // Derivar PDA de campaign_account_info
+    // ...
+    // Construir instrucción Anchor (usando layout real)
+    // ...
+    const ix = new TransactionInstruction({
+      keys: [
+        { pubkey: params.creator, isSigner: true, isWritable: true },
+        { pubkey: params.mint, isSigner: false, isWritable: false },
+        { pubkey: params.campaignAccountInfo, isSigner: false, isWritable: true },
+        { pubkey: params.creatorTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: params.campaignTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: params.tokenProgram, isSigner: false, isWritable: false },
+        { pubkey: params.systemProgram, isSigner: false, isWritable: false },
+        { pubkey: params.associatedTokenProgram, isSigner: false, isWritable: false },
+      ],
+      programId: new PublicKey('9FHnJ6S5P1UoWtyd6iqXYESy4WEGvGArA5W17f6H1gQk'),
+      data: Buffer.alloc(0) // TODO: serializar datos reales según Anchor IDL
+    });
+    const tx = new Transaction().add(ix);
+    return tx;
   }
 } 
