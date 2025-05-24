@@ -9,9 +9,9 @@ const Hero = () => {
           <p className="text-sm text-gray-500 uppercase tracking-wide">
             Built on Trust. Powered by Blockchain
           </p>
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
+          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
             Help Save Lives With Just One Click
-          </h1>
+          </h2>
           <p className="text-lg text-gray-700 max-w-xl">
             We connect critically ill patients with life-saving care and
             transparent blockchain-powered donations.
